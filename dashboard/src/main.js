@@ -45,6 +45,7 @@ import {
   FormPlugin,
   FormGroupPlugin,
   FormDatepickerPlugin,
+  ProgressPlugin,
 } from 'bootstrap-vue';
 
 import { ClientTable, ServerTable } from 'vue-tables-2';
@@ -109,6 +110,7 @@ Vue.use(PopoverPlugin);
 Vue.use(FormPlugin);
 Vue.use(FormGroupPlugin);
 Vue.use(FormDatepickerPlugin);
+Vue.use(ProgressPlugin);
 
 Vue.use(SkillsDirective);
 
