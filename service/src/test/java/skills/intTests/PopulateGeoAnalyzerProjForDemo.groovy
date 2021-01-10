@@ -1,11 +1,8 @@
 package skills.intTests
 
-import org.apache.commons.lang3.StringUtils
-import org.joda.time.DateTime
-import skills.intTests.utils.SkillsFactory
-import skills.intTests.utils.SkillsService
 
-import java.sql.SQLOutput
+import org.joda.time.DateTime
+import skills.intTests.utils.SkillsService
 
 class PopulateGeoAnalyzerProjForDemo {
 
