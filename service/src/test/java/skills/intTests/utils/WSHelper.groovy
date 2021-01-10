@@ -20,6 +20,7 @@ import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import groovy.util.logging.Slf4j
 import org.apache.http.client.HttpClient
+import org.apache.http.conn.ssl.NoopHostnameVerifier
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory
 import org.apache.http.conn.ssl.TrustAllStrategy
 import org.apache.http.impl.client.HttpClients
@@ -57,26 +58,27 @@ class WSHelper {
 
         RestTemplate restTemplate
 
-        if (pkiAuth) {
-            Resource resource = certificateRegistry.getCertificate(username)
-            assert resource != null : "No certificate found for ${username}"
-            KeyStore keyStore = KeyStore.getInstance("PKCS12")
-            keyStore.load(resource.getInputStream(), "skillspass".toCharArray())
-
+//        if (pkiAuth) {
+//            Resource resource = certificateRegistry.getCertificate(username)
+//            assert resource != null : "No certificate found for ${username}"
+//            KeyStore keyStore = KeyStore.getInstance("PKCS12")
+//            keyStore.load(resource.getInputStream(), "skillspass".toCharArray())
+//
             KeyStore trustStore = KeyStore.getInstance("JKS")
-            trustStore.load(new ClassPathResource("/certs/truststore.jks").getInputStream(), "skillspass".toCharArray())
+            trustStore.load(new ClassPathResource("/certs/truststore-demo.jks").getInputStream(), "changeme".toCharArray())
 
             SSLConnectionSocketFactory socketFactory = new SSLConnectionSocketFactory(new SSLContextBuilder()
                     .loadTrustMaterial(trustStore, TrustAllStrategy.INSTANCE)
-                    .loadKeyMaterial(keyStore, "skillspass".toCharArray()).build())
+//                    .loadKeyMaterial(keyStore, "skillspass".toCharArray())
+                    .build(), NoopHostnameVerifier.INSTANCE)
 
             HttpClient client = HttpClients.custom().setSSLSocketFactory(socketFactory).build()
             HttpComponentsClientHttpRequestFactory requestFactory = new  HttpComponentsClientHttpRequestFactory(client)
 
             restTemplate = new RestTemplate(requestFactory)
-        } else {
-            restTemplate = new RestTemplate()
-        }
+//        } else {
+//            restTemplate = new RestTemplate()
+//        }
 
         restTemplateWrapper = new RestTemplateWrapper(restTemplate, pkiAuth)
         oAuthRestTemplate = restTemplate

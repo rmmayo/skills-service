@@ -78,10 +78,10 @@ class RestTemplateWrapper extends RestTemplate {
     }
 
     private void setupRestTemplate() {
-        if(!this.pkiAuth) {
-            def requestFactory = getHttpRequestFactory()
-            restTemplate.setRequestFactory(requestFactory)
-        }
+//        if(!this.pkiAuth) {
+//            def requestFactory = getHttpRequestFactory()
+//            restTemplate.setRequestFactory(requestFactory)
+//        }
 
         restTemplate.setErrorHandler(new ResponseErrorHandler() {
             @Override
