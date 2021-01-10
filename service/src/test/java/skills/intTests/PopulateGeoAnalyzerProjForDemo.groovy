@@ -20,6 +20,11 @@ class PopulateGeoAnalyzerProjForDemo {
             'Interpolation'      : ['Interpolate', 'Isobands', 'Isolines'],
     ]
 
+    Map<String, List<String>> badgesAndSkills = [
+            'Map Detective'     : ['Intersection - Geo JSON', 'Bounding Box Clip', 'Isobands', 'Area Calculation', 'Transform Scale'],
+            'Coordinate Wizard' : ['Clean Coordinates', 'Bezier Spline', 'Flip', 'Isobands', 'Isolines', 'Transform Rotate'],
+    ]
+
     static void main(String[] args) {
         PopulateGeoAnalyzerProjForDemo driver = new PopulateGeoAnalyzerProjForDemo()
 
@@ -47,6 +52,15 @@ class PopulateGeoAnalyzerProjForDemo {
                 }
             }
         }
+
+        badgesAndSkills.each { String badgeName, List<String> skillNames -> {
+            skillsService.createBadge(createBadge(badgeName))
+            skillNames.each { skillName ->
+                {
+                    skillsService.assignSkillToBadge([projectId: projectId, badgeId: getBadgeId(badgeName), skillId: getSkillId(skillName)])
+                }
+            }
+        }}
     }
 
     void addSkills() {
@@ -96,12 +110,20 @@ class PopulateGeoAnalyzerProjForDemo {
         return [projectId: projectId, subjectId: getSubjectId(subjectName), name: subjectName]
     }
 
+    Map createBadge(String badgeName) {
+        return [projectId: projectId, badgeId: getBadgeId(badgeName), name: badgeName, enabled: 'true']
+    }
+
     String getSubjectId(String name) {
         return "${name.replaceAll("[^a-zA-Z0-9_]", "")}Subject"
     }
 
     String getSkillId(String name) {
         return "${name.replaceAll("[^a-zA-Z0-9_]", "")}Skill"
+    }
+
+    String getBadgeId(String name) {
+        return "${name.replaceAll("[^a-zA-Z0-9_]", "")}Badge"
     }
 
 
@@ -119,4 +141,5 @@ class PopulateGeoAnalyzerProjForDemo {
     List<Map> createSkills(int numSkills, String subjId, String projId = projectId, int pointIncrement = 10) {
         return (1..numSkills).collect { createSkill(projId, subjId, it, 0, 1, 480, pointIncrement) }
     }
+
 }
