@@ -22,6 +22,7 @@ import SkillsSpinner from '@/components/utils/SkillsSpinner.vue'
 import ProjectService from '@/components/projects/ProjectService'
 import MyProject from '@/components/projects/MyProject.vue'
 import EditProject from '@/components/projects/EditProject.vue'
+import GenerateProject from '@/components/projects/GenerateProject.vue'
 import { SkillsReporter } from '@skilltree/skills-client-js'
 import NoContent2 from '@/components/utils/NoContent2.vue'
 import { useAppConfig } from '@/common-components/stores/UseAppConfig.js'
@@ -53,6 +54,12 @@ const newProject = ref({
   show: false,
   isEdit: false,
   project: {}
+})
+
+const generateProject = ref({
+  isEdit: false,
+  project: {},
+  show: false
 })
 const showSearchProjectModal = ref(false)
 const sortOrder = ref({
@@ -224,6 +231,10 @@ const saveProject = (values, isEdit, projectId) => {
     })
 }
 
+const projectGenerated = () => {
+  console.log('projectGenerated')
+}
+
 const focusOnProjectCard = (projectId) => {
   nextTick(() => {
     const projCard = document.getElementById(`proj${projectId}`)
@@ -241,6 +252,12 @@ const createNewProject = () => {
   newProject.value.isEdit = false
   newProject.value.project = {}
   newProject.value.show = true
+};
+
+const generateNewProject = () => {
+  generateProject.value.isEdit = false
+  generateProject.value.project = {}
+  generateProject.value.show = true
 };
 </script>
 
@@ -273,6 +290,20 @@ const createNewProject = () => {
         aria-label="Create new Project"
         :track-for-focus="true"
         role="button" />
+      <SkillsButton
+          label="SkillTree AI Project"
+          icon="fa-solid fa-wand-magic-sparkles"
+          id="generateProjectBtn"
+          ref="generateProjButton"
+          @click="generateNewProject"
+          outlined
+          class="ml-2 text-primary bg-primary-contrast"
+          size="small"
+          :disabled="addProjectDisabled"
+          data-cy="generateProjectButton"
+          aria-label="Generate new Project from SkillTree AI JSON"
+          :track-for-focus="true"
+          role="button" />
 
       <div v-if="addProjectDisabled" class="mt-1">
         <InlineMessage severity="warn"
@@ -332,6 +363,16 @@ const createNewProject = () => {
       @project-saved="saveProject"
       @close="newProject.show = false"
       :enable-return-focus="true" />
+
+    <generate-project
+        v-if="generateProject.show"
+        v-model="generateProject.show"
+        :project="generateProject.project"
+        :is-edit="generateProject.isEdit"
+        @project-generated="projectGenerated"
+        @close="generateProject.show = false"
+        :enable-return-focus="true" />
+
     <pin-projects v-if="showSearchProjectModal" v-model="showSearchProjectModal"
                   @done="pinModalClosed" />
 
