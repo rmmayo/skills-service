@@ -14,18 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 <script setup>
-import {computed, ref} from 'vue'
+import { computed, ref } from 'vue'
 import {boolean, object, string, ValidationError} from 'yup'
-import {useDebounceFn} from '@vueuse/core'
-import InputSanitizer from '@/components/utils/InputSanitizer.js'
+import { useDebounceFn } from '@vueuse/core'
 import ProjectService from '@/components/projects/ProjectService.js'
-import {useAppConfig} from '@/common-components/stores/UseAppConfig.js'
-import {useCommunityLabels} from '@/components/utils/UseCommunityLabels.js'
+import { useAppConfig } from '@/common-components/stores/UseAppConfig.js'
+import { useCommunityLabels } from '@/components/utils/UseCommunityLabels.js'
 import SkillsInputFormDialog from '@/components/utils/inputForm/SkillsInputFormDialog.vue'
-import {useAccessState} from '@/stores/UseAccessState.js'
+import { useAccessState } from '@/stores/UseAccessState.js'
 import CommunityProtectionControls from '@/components/projects/CommunityProtectionControls.vue'
-import {useDescriptionValidatorService} from '@/common-components/validators/UseDescriptionValidatorService.js'
-import FileUpload from "primevue/fileupload";
+import { useDescriptionValidatorService } from '@/common-components/validators/UseDescriptionValidatorService.js'
+import FileUpload from 'primevue/fileupload'
 
 const model = defineModel()
 const props = defineProps(['project', 'isEdit', 'isCopy'])
@@ -34,14 +33,10 @@ const accessState = useAccessState()
 
 let formId = 'generateProjectDialog'
 let modalTitle = 'Generate Project'
-if (props.isEdit) {
-  formId = `editProjectDialog-${props.project.projectId}`
-  modalTitle = 'Editing Existing Project'
-} else if (props.isCopy) {
-  formId = `copyProjectDialog-${props.project.projectId}`
-  modalTitle ='Copy Project'
-}
 const appConfig = useAppConfig()
+
+const jsonText = ref('')
+const hostedFileName = ref(null)
 
 const communityLabels = useCommunityLabels()
 const initialValueForEnableProtectedUserCommunity = communityLabels.isRestrictedUserCommunity(props.project.userCommunity)
@@ -116,32 +111,57 @@ const checkProjectCommunityRequirements =(value, testContext) => {
 }
 
 const schema = object({
-  'projectName': string()
-    .trim()
-    .required()
-    .min(appConfig.minNameLength)
-    .max(appConfig.maxProjectNameLength)
-    .nullValueNotAllowed()
-    .test('uniqueName', 'Project Name already exists', (value) => checkProjNameUnique(value))
-    .customNameValidator('Project Name')
-    .label('Project Name'),
-  'projectId': string()
-    .required()
-    .min(appConfig.minIdLength)
-    .max(appConfig.maxIdLength)
-    .idValidator()
-    .nullValueNotAllowed()
-    .test('uniqueId', 'Project ID already exists', (value) => checkProjIdUnique(value))
-    .label('Project ID'),
+  // 'projectName': string()
+  //   .trim()
+  //   .required()
+  //   .min(appConfig.minNameLength)
+  //   .max(appConfig.maxProjectNameLength)
+  //   .nullValueNotAllowed()
+  //   .test('uniqueName', 'Project Name already exists', (value) => checkProjNameUnique(value))
+  //   .customNameValidator('Project Name')
+  //   .label('Project Name'),
+  // 'projectId': string()
+  //   .required()
+  //   .min(appConfig.minIdLength)
+  //   .max(appConfig.maxIdLength)
+  //   .idValidator()
+  //   .nullValueNotAllowed()
+  //   .test('uniqueId', 'Project ID already exists', (value) => checkProjIdUnique(value))
+  //   .label('Project ID'),
   'enableProtectedUserCommunity': boolean()
     .test('communityReqValidation', 'Unmet community requirements', (value, testContext) => checkProjectCommunityRequirements(value, testContext))
     .label('Enable Protected User Community'),
-  'description': string()
-    .max(appConfig.descriptionMaxLength)
-    .test('descriptionValidation', 'Description is invalid', (value, testContext) => checkDescription(value, testContext))
-    .label('Project Description')
+  // 'description': string()
+  //   .max(appConfig.descriptionMaxLength)
+  //   .test('descriptionValidation', 'Description is invalid', (value, testContext) => checkDescription(value, testContext))
+  //   .label('Project Description')
+  // 'jsonFileName': string()
+  //     .trim()
+  //     .required()
+  //     // .min(appConfig.minNameLength)
+  //     // .max(appConfig.maxProjectNameLength)
+  //     .nullValueNotAllowed()
+  //     // .test('uniqueName', 'Project Name already exists', (value) => checkProjNameUnique(value))
+  //     // .customNameValidator('Project Name')
+  //     .label('JSON File Name'),
+  //
+  // 'jsonText': string()
+  //     .trim()
+  //     .required()
+  //     // .min(appConfig.minNameLength)
+  //     // .max(appConfig.maxProjectNameLength)
+  //     .nullValueNotAllowed()
+  //     // .test('uniqueName', 'Project Name already exists', (value) => checkProjNameUnique(value))
+  //     // .customNameValidator('Project Name')
+  //     .label('Project JSON'),
+  //
+  // 'jsonFile': yup.object()
+  //     .nullable()
+  //     // .required()
+  //     // .test('videoMimeTypesValidation', (value, context) => slidesMimeTypesValidation(value, context))
+  //     // .test('videoMaxSizeValidation', (value, context) => slidesMaxSizeValidation(value, context))
+  //     .label('File'),
 })
-
 
 const initialProjData = ref({
   projectId: props.project.projectId || '',
@@ -150,47 +170,23 @@ const initialProjData = ref({
   enableProtectedUserCommunity: false,
 })
 
-const asyncLoadData = () => {
-  const loadDescription = () => {
-    if(props.isEdit) {
-      return ProjectService.loadDescription(props.project.projectId).then((data) => {
-        initialProjData.value.description = data.description ? data.description : ''
-        initialProjData.value = { ...initialProjData.value }
-        return {'description': data.description || ''}
-      })
-    }
-    return Promise.resolve({})
-  }
-
-  return loadDescription()
-}
-
 const close = () => { model.value = false }
 
 const isRootUser = computed(() => accessState.isRoot)
-const saveProject = (values) => {
-  const projToSave = {
-    ...values,
-    originalProjectId: props.project.projectId,
-    isEdit: props.isEdit,
-    name: InputSanitizer.sanitize(values.projectName),
-    projectId: InputSanitizer.sanitize(values.projectId)
-  };
-
+const generateProject = (values) => {
+  const generatedProject = JSON.parse(jsonText.value)
   if (initialValueForEnableProtectedUserCommunity) {
-    projToSave.enableProtectedUserCommunity = initialValueForEnableProtectedUserCommunity
+    generatedProject.project.enableProtectedUserCommunity =
+      initialValueForEnableProtectedUserCommunity
   }
 
-  emit('project-generated', projToSave, props.isEdit, props.project.projectId)
-  return Promise.resolve();
+  emit('project-generated', generatedProject)
+  return Promise.resolve()
 }
 
 const onSavedProject = () => {
   close()
 }
-
-const jsonText = ref('')
-const hostedFileName = ref(null)
 
 const openFileDialog = (event) => {
   const jsonFileInput = document.getElementById('jsonFileInput');
@@ -201,9 +197,9 @@ const openFileDialog = (event) => {
 
 const onFileSelectedEvent = (selectEvent) => {
   const selectedJsonFile = selectEvent.files[0];
-  console.log('selectedJsonFile', selectedJsonFile);
-  selectedJsonFile.text().then(data => {
-    console.log('jsonText', data);
+  // console.log('selectedJsonFile', selectedJsonFile);
+  selectedJsonFile.text().then((data) => {
+    // console.log('jsonText', data)
     jsonText.value = data
     hostedFileName.value = selectedJsonFile.name;
   })
@@ -221,19 +217,11 @@ const onFileSelectedEvent = (selectEvent) => {
     :saveButtonLabel="`${isCopy ? 'Copy Project' : 'Save'}`"
     :validation-schema="schema"
     :initial-values="initialProjData"
+    :ok-button-disabled="!jsonText"
     @saved="onSavedProject"
     @close="close"
-    :async-load-data-function="asyncLoadData"
-    :save-data-function="saveProject"
-  >
+    :save-data-function="generateProject">
     <template #default>
-<!--      <SkillsNameAndIdInput-->
-<!--        :name-label="`${isCopy ? 'New Project Name' : 'Project Name'}`"-->
-<!--        name-field-name="projectName"-->
-<!--        :id-label="`${props.isCopy ? 'New Project ID' : 'Project ID'}`"-->
-<!--        id-field-name="projectId"-->
-<!--        :name-to-id-sync-enabled="!props.isEdit" />-->
-
       <community-protection-controls
         v-model:enable-protected-user-community="enableProtectedUserCommunity"
         :project="project"
@@ -263,13 +251,12 @@ const onFileSelectedEvent = (selectEvent) => {
           </InputGroupAddon>
         </InputGroup>
       </div>
-      <div>
-        <div v-if="jsonText">
-          <h3>Processed Data:</h3>
-          <pre>{{ jsonText }}</pre>
-        </div>
-      </div>
-
+      <!--      <div>-->
+      <!--        <div v-if="jsonText">-->
+      <!--          <h3>Processed Data:</h3>-->
+      <!--          <pre>{{ jsonText }}</pre>-->
+      <!--        </div>-->
+      <!--      </div>-->
     </template>
   </SkillsInputFormDialog>
 </template>

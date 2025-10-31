@@ -35,6 +35,7 @@ import SettingsService from '@/components/settings/SettingsService.js'
 import LengthyOperationProgressBarModal from '@/components/utils/modal/LengthyOperationProgressBarModal.vue'
 import { useAdminProjectsState } from '@/stores/UseAdminProjectsState.js'
 import { useLog } from '@/components/utils/misc/useLog.js'
+import GenerateProjectService from "@/components/projects/GenerateProjectService.js";
 
 const appConfig = useAppConfig()
 const accessState = useAccessState()
@@ -59,6 +60,8 @@ const newProject = ref({
 const generateProject = ref({
   isEdit: false,
   project: {},
+  isComplete: false,
+  generating: false,
   show: false
 })
 const showSearchProjectModal = ref(false)
@@ -231,8 +234,27 @@ const saveProject = (values, isEdit, projectId) => {
     })
 }
 
-const projectGenerated = () => {
-  console.log('projectGenerated')
+const projectGenerated = (generatedProject) => {
+  generateProject.value.generating = true
+  generateProject.value.isComplete = false
+  GenerateProjectService.generateProject(generatedProject)
+    .then((projRes) => {
+      generateProject.value.isComplete = true
+      generateProject.value.generating = false
+      const { projectId } = projRes
+      if (isRootUser.value) {
+        SettingsService.pinProject(projectId)
+          .then(() => {
+            return { ...projRes, originalProjectId: projectId }
+          })
+      }
+      return ProjectService.getProject(projectId)
+        .then((retrievedProj) => {
+          const projWithOriginalId = { ...retrievedProj, originalProjectId: projectId }
+          projectAdded(projWithOriginalId)
+          return projWithOriginalId
+        })
+    })
 }
 
 const focusOnProjectCard = (projectId) => {
@@ -383,6 +405,14 @@ const generateNewProject = () => {
                                           title="Copying Project"
                                           progress-message="Copying Project's Training Profile"
                                           success-message="Project's training profile was successfully copied, please enjoy!" />
+
+    <lengthy-operation-progress-bar-modal v-if="generateProject.generating"
+                                          v-model="generateProject.generating"
+                                          :is-complete="generateProject.isComplete"
+                                          @operation-done="loadProjectsAfterCopy"
+                                          title="Generating Project"
+                                          progress-message="Generating Training Profile"
+                                          success-message="Training profile was successfully generated, please enjoy!" />
   </div>
 </template>
 
