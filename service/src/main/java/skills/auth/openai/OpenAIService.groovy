@@ -202,7 +202,7 @@ class OpenAIService {
     static class CompletionsRequest {
         String model
         List<CompletionMessage> messages
-        Usage usage
+//        Usage usage
         boolean stream = false
     }
 
