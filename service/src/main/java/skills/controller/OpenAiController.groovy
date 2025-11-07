@@ -43,6 +43,28 @@ class OpenAiController {
     @Value("classpath:SkillTreeConcepts.pdf")
     Resource skillTreeConceptsResourceFile;
 
+
+    @GetMapping("/vector_stores")
+    def listVectorStores() {
+        return openAIAssistantService.listVectorStores()
+    }
+    @GetMapping("/vector_stores/{id}")
+    def getVectorStore(@PathVariable("id") String vectorId) {
+        return openAIAssistantService.getVectorStore(vectorId)
+    }
+    @GetMapping("/vector_stores/{id}/files")
+    def getVectorStoreFiles(@PathVariable("id") String vectorId) {
+        return openAIAssistantService.getVectorStoreFiles(vectorId)
+    }
+    @GetMapping("/threads/{id}")
+    def getThread(@PathVariable("id") String threadId) {
+        return openAIAssistantService.getThread(threadId)
+    }
+    @GetMapping("/files")
+    def listFiles() {
+        return openAIAssistantService.listFiles()
+    }
+
     @PostMapping(value = "/stream/description", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     Flux<String> generateDescriptionAndStream(@RequestBody GenDescRequest genDescRequest) {
         SkillsValidator.isNotBlank(genDescRequest.instructions, "genDescRequest.instructions")

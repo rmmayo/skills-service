@@ -52,6 +52,37 @@ class OpenAIAssistantService {
         }
     }
 
+    def listFiles() {
+        return callGetEndpoint("/files")
+    }
+
+    def getThread(String threadId) {
+        return callGetEndpoint("/threads/${threadId}".toString())
+    }
+
+    def listVectorStores() {
+        return callGetEndpoint("/vector_stores")
+    }
+
+    def getVectorStore(String storeId) {
+        return callGetEndpoint("/vector_stores/${storeId}".toString())
+    }
+
+    def getVectorStoreFiles(String storeId) {
+        return callGetEndpoint("/vector_stores/${storeId}/files".toString())
+    }
+
+
+    private def callGetEndpoint(String endpoint) {
+        return webClient.get()
+                .uri(endpoint)
+                .contentType(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .bodyToMono(Map)
+                .block()
+    }
+
+
     /** STEP 1: Create a vector store and upload the files */
     String uploadFilesToVectorStore(List<File> files) {
         List<String> fileIds = []

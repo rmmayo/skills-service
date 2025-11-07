@@ -18,6 +18,7 @@ package skills.storage.repos
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import skills.storage.model.WebNotification
 
 import java.util.stream.Stream
@@ -28,13 +29,13 @@ interface WebNotificationsRepo extends JpaRepository<WebNotification, Integer> {
         where (n.userId = :userId or n.userId is null)
             and (n.showUntil > CURRENT_TIMESTAMP or n.showUntil is null) 
             and n.id not in (select a.webNotificationsRefId from WebNotificationAck a where a.userId = :userId)""")
-    List<WebNotification> findUsersNotifications(String userId, Pageable pageRequest)
+    List<WebNotification> findUsersNotifications(@Param("userId") String userId, Pageable pageRequest)
 
     @Query("""select n from WebNotification n 
         where (n.userId = :userId or n.userId is null) 
             and (n.showUntil > CURRENT_TIMESTAMP or n.showUntil is null)
             and n.id not in (select a.webNotificationsRefId from WebNotificationAck a where a.userId = :userId)""")
-    Stream<WebNotification> findAllUsersNotifications(String userId)
+    Stream<WebNotification> findAllUsersNotifications(@Param("userId") String userId)
 
     List<WebNotification> findAllByLookupId(String lookupId)
 
