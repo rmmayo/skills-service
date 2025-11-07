@@ -313,7 +313,7 @@ const generateNewProject = () => {
         :track-for-focus="true"
         role="button" />
       <SkillsButton
-          label="SkillTree AI Project"
+          label="AI Project"
           icon="fa-solid fa-wand-magic-sparkles"
           id="generateProjectBtn"
           ref="generateProjButton"

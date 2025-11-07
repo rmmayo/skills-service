@@ -21,4 +21,8 @@ export default {
       .then(success)
       .catch(failure);
   },
+
+  asyncUpload(url, formData) {
+    return axios.post(url, formData, { handleError: false })
+  },
 };

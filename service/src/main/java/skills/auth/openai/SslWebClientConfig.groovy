@@ -66,7 +66,7 @@ class SslWebClientConfig {
     @Value('#{"${skills.openai.stream.closeNotifyReadTimeout:5000}"}')
     Integer closeNotifyReadTimeout = 5000
 
-    WebClient createWebClient() throws Exception {
+    WebClient createWebClient(String baseUrl=null) throws Exception {
         // Get system properties
         String keyStorePath = System.getProperty("javax.net.ssl.keyStore");
         String keyStorePassword = System.getProperty("javax.net.ssl.keyStorePassword");
@@ -124,11 +124,17 @@ class SslWebClientConfig {
         }
 
         // Create WebClient with the configured HttpClient
-        return WebClient.builder()
+        WebClient.Builder builder = WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer ${openAiKey}")
-                .build();
+                .defaultHeader("OpenAI-Beta", "assistants=v2")
+
+        if (baseUrl) {
+            builder.baseUrl(baseUrl)
+        }
+
+        return builder.build();
     }
 
     private X509TrustManager getTrustedManager(TrustManagerFactory tmf) {
