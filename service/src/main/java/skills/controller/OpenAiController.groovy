@@ -22,6 +22,7 @@ import groovy.transform.ToString
 import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.core.io.FileSystemResource
 import org.springframework.core.io.Resource
 import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.*
@@ -88,8 +89,9 @@ You are a chatbot designed to assist in creating a comprehensive training profil
 
 - **Output**:
   - Initially, present the training profile in a Markdown format for easy review.
-  - Be prepared to translate the profile into a SkillTree-specific JSON format upon request.
+  - Be prepared to translate the training profile into a SkillTree-specific JSON format upon request.
   - Do not mention JSON format to the end user.
+  - Do not mention Notes or gaps or any other follow up information to the end user.
 
 ### Handling Ambiguity:
 - If the knowledge base lacks sufficient information, clearly state the gaps and suggest potential solutions.
@@ -109,6 +111,58 @@ You are a chatbot designed to assist in creating a comprehensive training profil
 - **[Badge Name]**: 
   - **Description**: [Brief description of the badge]
   - **Criteria**: [List of skills required to earn the badge]
+"""
+    final static String generateJsonInstructions = """
+Translate the training profile into a SkillTree-specific JSON format.
+
+### Detailed Instructions:
+
+- **Output**:
+  - The JSON should follow the format provided in the Example Output section.
+  - Keep the description values as Markdown formatted text.
+  - projectId, subjectId, skillId, badgeId: must be unique identifiers; be english characters only; no numbers of special characters
+  - icon: icon css class from FontAwesomeFree library
+  - Do not mention JSON format to the end user.
+  - Do not mention Notes or gaps or any other follow up information to the end user.
+
+### Example Output:
+{
+  "project": {
+    "id": "projId",
+    "name": "name goes here",
+    "description": "detailed description"
+  },
+  "subjects": [
+    {
+      "id": "subjectId",
+      "name": "Subject Name",
+      "description": "subject description",
+     "icon": "fa-solid fa-building",
+      "skills": [
+        {"name": "skill name", "skillId": "skillId", "description": "skill description", "icon": "fa-building", "pointIncrement": 10, "numOccurrencesToCompletion": 1, "selfReporting": "HonorSystem"},
+        {"name": "skill name", "skillId": "skillId", "description": "skill description", "icon": "fa-building", "pointIncrement": 10, "numOccurrencesToCompletion": 1, "selfReporting": "HonorSystem"},
+      ]
+    },
+     {
+      "id": "subjectId",
+      "name": "Subject Name",
+      "description": "subject description",
+      "icon": "fa-solid fa-building",
+      "skills": [
+        {"name": "skill name", "skillId": "skillId", "description": "skill description", "icon": "fa-building", "pointIncrement": 10, "numOccurrencesToCompletion": 1, "selfReporting": "HonorSystem"},
+        {"name": "skill name", "skillId": "skillId", "description": "skill description", "icon": "fa-building", "pointIncrement": 10, "numOccurrencesToCompletion": 1, "selfReporting": "HonorSystem"},
+      ]
+    },
+  ],
+  "badges": [
+    {
+      "id": "badgeId",
+      "name": "Badge Name",
+      "description": "badge description",
+      "icon": "fa-solid fa-building",
+      "skillIds": [ "skillId1", "skillId2"]
+    },
+ }
 """
 
     @GetMapping("/vector_stores")
@@ -167,16 +221,15 @@ You are a chatbot designed to assist in creating a comprehensive training profil
 
     @PostMapping('/uploadAndStore')
     def uploadAndStore(@RequestParam("files") MultipartFile[] multipartFiles) {
-        List<File> filesToUpload = []
+        List<FileSystemResource> filesToUpload = []
 
         // Create vector store & attach files, then wait for ingestion
         UserChatSettings userChatSettings = loadUserChatSetting()
         String vectorStoreId
         if (userChatSettings?.vectorStoreId) {
             vectorStoreId = userChatSettings?.vectorStoreId
-            log.info("Vector store already exist [{}]", userChatSettings.vectorStoreId)
+            log.info("Vector store already exists [{}]", userChatSettings.vectorStoreId)
         } else {
-//            filesToUpload.add(skillTreeConceptsResourceFile.getFile())
             vectorStoreId = openAIAssistantService.createVectorStore("Synergy SkillTree Curriculum Development Store")
             log.info("Vector store created [{}]", vectorStoreId)
         }
@@ -185,7 +238,7 @@ You are a chatbot designed to assist in creating a comprehensive training profil
             log.info("received file [{}]", multipartFile.originalFilename)
             def file = new File(System.getProperty('java.io.tmpdir'), multipartFile.originalFilename)
             multipartFile.transferTo(file)
-            filesToUpload.add(file);
+            filesToUpload.add(new FileSystemResource(file));
         }
 
         // upload all files and collect the fileIds
@@ -193,11 +246,22 @@ You are a chatbot designed to assist in creating a comprehensive training profil
         List files = filesToUpload.collect { openAIAssistantService.uploadFile(it) }
         log.info("Uploaded files: [{}]", files)
 
-        openAIAssistantService.attachFilesToVectorStore(vectorStoreId, files.collect { it.id})
+        openAIAssistantService.attachFilesToVectorStore(vectorStoreId, files.collect { it.id as String})
         openAIAssistantService.waitUntilVectorStoreReady(vectorStoreId)
         log.info("Vector store is ready.")
         saveUserSetting(vectorStoreId, null)
         return [vectorStoreId: vectorStoreId, files: files ]
+    }
+
+    @PostMapping("/generateProjectJson")
+    ChatResponse generateProjectJson() {
+        UserChatSettings userChatSettings = loadUserChatSetting()
+        String conversationId = userChatSettings.conversationId
+        assert conversationId, "No conversation id found in user settings"
+
+        def a1 = openAIAssistantService.askWithServerContext(conversationId, userChatSettings.vectorStoreId, null, generateJsonInstructions)
+        log.debug("\nAnswer:\n[{}]", a1)
+        return new ChatResponse(response: a1.text, conversationId: conversationId, vectorStoreId: userChatSettings.vectorStoreId)
     }
 
     @PostMapping("/chat")

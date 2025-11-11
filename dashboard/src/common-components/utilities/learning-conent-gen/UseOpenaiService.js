@@ -100,8 +100,8 @@ export const useOpenaiService = () => {
       return axios.get(`/openai/models`).then((response) => response.data);
     }
 
-    const chat = (userInstructions) => {
-      return axios.post(`/openai/chat`, { question: userInstructions }) ;
+    const generateProjectJson = () => {
+      return axios.post(`/openai/generateProjectJson`).then((response) => response.data.response);
     }
 
     const getKnowledgeStoreFiles = ()  => {
@@ -113,7 +113,7 @@ export const useOpenaiService = () => {
         prompt,
         cancelCurrentPrompt,
         getAvailableModels,
-        chat: chat,
+        generateProjectJson,
         getKnowledgeStoreFiles,
     }
 }

@@ -255,7 +255,7 @@ skill.description
   "project": {
     "id": "projId",
     "name": "name goes here",
-    "description": "detailed descripton"
+    "description": "detailed description"
   },
   "subjects": [
     {

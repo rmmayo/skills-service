@@ -14,7 +14,7 @@ import { useInstructionGenerator } from '@/common-components/utilities/learning-
 import { useDescriptionValidatorService } from '@/common-components/validators/UseDescriptionValidatorService.js'
 import { useAppConfig } from '@/common-components/stores/UseAppConfig.js'
 import AiPromptDialog from '@/common-components/utilities/learning-conent-gen/AiPromptDialog.vue'
-import AiKnowledgeStore from "@/common-components/utilities/learning-conent-gen/AiKnowledgeStore.vue";
+import AiKnowledgeStore from '@/common-components/utilities/learning-conent-gen/AiKnowledgeStore.vue'
 
 const model = defineModel()
 const props = defineProps({
@@ -23,7 +23,7 @@ const props = defineProps({
     default: null
   }
 })
-const emit = defineEmits(['generated-desc'])
+const emit = defineEmits(['use-generated'])
 const route = useRoute()
 const log = useLog()
 const imgHandler = useImgHandler()
@@ -72,7 +72,6 @@ const createPromptInstructions = (userEnterInstructions) => {
   //   instructionsToSend = instructionsGenerator.newDescriptionInstructions(userEnterInstructions)
   // }
 
-  instructionsToSend = `list the files in the vector store and ${userEnterInstructions}.`
   instructionsToSend = userEnterInstructions
 
   return instructionsToSend
@@ -111,8 +110,8 @@ const handleGenerationCompleted = (generated) => {
   }
 }
 
-const useGenerated = (historyItem) => {
-  emit('generated-desc', historyItem.generatedValue)
+const useGenerated = async (historyItem) => {
+  emit('use-generated')
 }
 
 const validationService = useDescriptionValidatorService()

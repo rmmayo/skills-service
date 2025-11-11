@@ -37,12 +37,14 @@ import { useAdminProjectsState } from '@/stores/UseAdminProjectsState.js'
 import { useLog } from '@/components/utils/misc/useLog.js'
 import GenerateProjectService from "@/components/projects/GenerateProjectService.js";
 import GenerateProjectChatDialog from '@/components/projects/GenerateProjectChatDialog.vue'
+import { useOpenaiService } from '@/common-components/utilities/learning-conent-gen/UseOpenaiService.js'
 
 const appConfig = useAppConfig()
 const accessState = useAccessState()
 const announcer = useSkillsAnnouncer()
 const elementHelper = useElementHelper()
 const projectsState = useAdminProjectsState()
+const openaiService = useOpenaiService()
 const log = useLog()
 
 onMounted(() => {
@@ -236,10 +238,48 @@ const saveProject = (values, isEdit, projectId) => {
     })
 }
 
-const projectGenerated = (generatedProject) => {
+const generatingProjectJson = async () => {
   generateProject.value.generating = true
   generateProject.value.isComplete = false
-  GenerateProjectService.generateProject(generatedProject)
+
+  const generatedProjectJson = await openaiService.generateProjectJson()
+  const generatedProject = extractJsonFromString(generatedProjectJson)
+  projectGenerated(generatedProject)
+}
+
+const extractJsonFromString = (text) => {
+  const regex = /```json\s*([\s\S]*?)\s*```/
+  const match = text.match(regex)
+  let jsonString = text
+  if (match && match[1]) {
+    jsonString = match[1].trim()
+    console.log("'```json' code block found in the string.")
+  }
+
+  // Clean up: Remove any trailing commas that would invalidate the JSON,
+  // like the comma in '}, }' which is present in the example data.
+  jsonString = jsonString.replace(/,\s*\}/g, '}')
+
+  // Clean up: Replace non-breaking space characters (\u00A0) which sometimes creep into copied text.
+  jsonString = jsonString.replace(/\u00A0/g, ' ')
+
+  try {
+    // 2. Parse the cleaned string into a JavaScript object
+    console.log('attempting to parse JSON', jsonString)
+    return JSON.parse(jsonString)
+  } catch (e) {
+    console.error(
+      'Error parsing JSON. Check the structure for syntax errors or invalid characters.',
+      e
+    )
+    return null
+  }
+}
+
+const projectGenerated = async (generatedProject) => {
+  generateProject.value.generating = true
+  generateProject.value.isComplete = false
+  await GenerateProjectService.generateProject(generatedProject)
     .then((projRes) => {
       generateProject.value.isComplete = true
       generateProject.value.generating = false
@@ -314,24 +354,11 @@ const generateNewProject = () => {
         aria-label="Create new Project"
         :track-for-focus="true"
         role="button" />
-      <SkillsButton
-          label="AI Project"
-          icon="fa-solid fa-wand-magic-sparkles"
-          id="generateProjectBtn"
-          ref="generateProjButton"
-          @click="generateNewProject"
-          outlined
-          class="mx-2 text-primary bg-primary-contrast"
-          size="small"
-          :disabled="addProjectDisabled"
-          data-cy="generateProjectButton"
-          aria-label="Generate new Project from SkillTree AI JSON"
-          :track-for-focus="true"
-          role="button" />
 
       <SkillsButton icon="fa-solid fa-wand-magic-sparkles"
-                    label="AI Chat"
+                    label="AI Project"
                     size="small"
+                    class="ml-2"
                     data-cy="aiButton"
                     @click="showGenerateProjectChatDialog = true"/>
 
@@ -394,18 +421,10 @@ const generateNewProject = () => {
       @close="newProject.show = false"
       :enable-return-focus="true" />
 
-    <generate-project
-        v-if="generateProject.show"
-        v-model="generateProject.show"
-        :project="generateProject.project"
-        :is-edit="generateProject.isEdit"
-        @project-generated="projectGenerated"
-        @close="generateProject.show = false"
-        :enable-return-focus="true" />
-
     <generate-project-chat-dialog
       v-if="showGenerateProjectChatDialog"
       ref="generateDescriptionDialogRef"
+      @use-generated="generatingProjectJson"
       v-model="showGenerateProjectChatDialog" />
 
     <pin-projects v-if="showSearchProjectModal" v-model="showSearchProjectModal"

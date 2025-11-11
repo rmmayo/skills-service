@@ -2,7 +2,6 @@ package skills.auth.openai
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
-import groovy.json.JsonSlurper
 import groovy.transform.Canonical
 import groovy.transform.ToString
 import groovy.util.logging.Slf4j
@@ -10,7 +9,6 @@ import jakarta.annotation.PostConstruct
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.ParameterizedTypeReference
-import org.springframework.core.io.FileSystemResource
 import org.springframework.core.io.Resource
 import org.springframework.http.MediaType
 import org.springframework.http.client.MultipartBodyBuilder
@@ -25,15 +23,6 @@ import reactor.core.publisher.SynchronousSink
 @Service
 @Slf4j
 class OpenAIAssistantService {
-
-
-    private final JsonSlurper jsonSlurper = new JsonSlurper()
-
-    private String vectorStoreId
-    private String assistantId
-    private String threadId
-
-    private static final String BASE_URL = "https://api.openai.com/v1"
 
     @Value('#{"${skills.openai.host:null}"}')
     String openAiHost
@@ -83,10 +72,6 @@ class OpenAIAssistantService {
                 .retrieve()
                 .bodyToMono(Map)
                 .block()
-    }
-
-    Map uploadFile(File file) {
-        return uploadFile(new FileSystemResource(file))
     }
 
     /**
@@ -143,6 +128,7 @@ class OpenAIAssistantService {
      * Docs suggest polling until ingestion is complete before querying.
      */
     void waitUntilVectorStoreReady(String vectorStoreId) {
+        Integer counter = 0
         while (true) {
             Map listing = webClient.get()
                     .uri { b -> b.path("/vector_stores/${vectorStoreId}/files").queryParam("limit", "100").build() }
@@ -153,6 +139,9 @@ class OpenAIAssistantService {
             List<Map> files = (List<Map>) listing.get("data")
             if (files != null && files.every { f -> !"in_progress".equalsIgnoreCase((String) f.get("status")) }) {
                 return
+            }
+            if (counter++ % 10 == 0) {
+                log.info("waitUntilVectorStoreReady: iteration ${counter}, still waiting for vector store to be ready")
             }
             Thread.sleep(1500L)
         }
@@ -239,19 +228,17 @@ class OpenAIAssistantService {
                 if ("response.output_text.delta".equals(event)) {
                     String delta = node.path("delta").asText("")
                     delta = delta.replaceAll('\\n', '<<newline>>')
-                    log.debug("Response: [{}] from json=[{}]", delta, node)
+                    log.trace("Response: [{}] from json=[{}]", delta, node)
                     if (!delta.isEmpty()) sink.next(new StreamChunk(type: "delta", text: delta))
                     return
                 }
 
                 // Some models emit a final consolidated text chunk
-//                if ("response.output_text.done".equals(event)) {
-//                    String text = node.path("text").asText("")
-//                    text = text.replaceAll('\\n', '<<newline>>')
-//                    log.debug("Response: [{}] from json=[{}]", text, node)
-//                    if (!text.isEmpty()) sink.next(new StreamChunk(type: "delta", text: text))
-//                    return
-//                }
+                if ("response.output_text.done".equals(event)) {
+                    String text = node.path("text").asText("")
+                    log.info("Response: [{}] from json=[{}]", text, node)
+                    return
+                }
 
                 // Stream finished
                 if ("response.completed".equals(event)) {

@@ -178,7 +178,7 @@ const onStartStopBtn = () => {
 }
 
 const checkThatProgressWasMade = () => {
-  const TIMEOUT_MS = 5000;
+  const TIMEOUT_MS = 15000;
   const MAX_ATTEMPTS = 6; // Max 30 seconds (5s * 6)
   let numAttempts = 0;
   const statusMessages = [
