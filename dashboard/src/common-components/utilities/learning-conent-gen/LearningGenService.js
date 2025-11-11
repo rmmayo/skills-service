@@ -16,6 +16,7 @@
 import axios from 'axios';
 
 export default {
+
     generateDescription(projectId, instructions) {
         return axios.post(`/admin/projects/${encodeURIComponent(projectId)}/generateDescription`, { instructions}, { handleError: false })
             .then((response) => response.data);

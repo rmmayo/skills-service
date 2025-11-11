@@ -61,6 +61,8 @@ class OpenAiController {
     @Autowired
     UserRepo userRepo
 
+    JsonSlurper jsonSlurper = new JsonSlurper()
+
     static final String SETTING = 'genProjSettings'
     static final String SETTING_GROUP = 'user'
 
@@ -101,9 +103,44 @@ The response should be structured and scannable: Detailed descriptions that use 
         return openAIService.getAvailableModels()
     }
 
+    @GetMapping("/storeFiles")
+    List getCurrentStoreFiles() {
+        UserChatSettings userChatSettings = loadUserChatSetting()
+        if (!userChatSettings?.vectorStoreId) {
+            return []
+        }
+        def vectorFiles = openAIAssistantService.getVectorStoreFiles(userChatSettings.vectorStoreId)
+        def allFilesParsed = openAIAssistantService.listFiles()
+
+        vectorFiles.data.collect { vectorFile -> {
+            def file = allFilesParsed.data.find { it.id == vectorFile.id }
+            return [
+                    id: vectorFile.id,
+                    status: file.status,
+                    filename: file.filename,
+                    created_at: file.created_at,
+                    purpose: file.purpose,
+                    bytes: file.bytes
+            ]
+        }}
+    }
+
     @PostMapping('/uploadAndStore')
-    String uploadAndStore(@RequestParam("files") MultipartFile[] multipartFiles) {
-        List<File> filesToUpload = [skillTreeConceptsResourceFile.getFile()]
+    def uploadAndStore(@RequestParam("files") MultipartFile[] multipartFiles) {
+        List<File> filesToUpload = []
+
+        // Create vector store & attach files, then wait for ingestion
+        UserChatSettings userChatSettings = loadUserChatSetting()
+        String vectorStoreId
+        if (userChatSettings?.vectorStoreId) {
+            vectorStoreId = userChatSettings?.vectorStoreId
+            log.info("Vector store already exist [{}]", userChatSettings.vectorStoreId)
+        } else {
+            filesToUpload.add(skillTreeConceptsResourceFile.getFile())
+            vectorStoreId = openAIAssistantService.createVectorStore("Synergy SkillTree Curriculum Development Store")
+            log.info("Vector store created [{}]", vectorStoreId)
+        }
+
         for (MultipartFile multipartFile : multipartFiles) {
             log.info("received file [{}]", multipartFile.originalFilename)
             def file = new File(System.getProperty('java.io.tmpdir'), multipartFile.originalFilename)
@@ -113,17 +150,14 @@ The response should be structured and scannable: Detailed descriptions that use 
 
         // upload all files and collect the fileIds
         log.info("Uploading [{}] file(s)...", filesToUpload.size())
-        List<String> fileIds = filesToUpload.collect { openAIAssistantService.uploadFile(it) }
-        log.info("Uploaded file IDs: [{}]", fileIds)
+        List files = filesToUpload.collect { openAIAssistantService.uploadFile(it) }
+        log.info("Uploaded files: [{}]", files)
 
-        // Create vector store & attach files, then wait for ingestion
-        String vectorStoreId = openAIAssistantService.createVectorStore("Synergy SkillTree Curriculum Development Store")
-        log.info("Vector store created [{}]", vectorStoreId)
-        openAIAssistantService.attachFilesToVectorStore(vectorStoreId, fileIds)
+        openAIAssistantService.attachFilesToVectorStore(vectorStoreId, files.collect { it.id})
         openAIAssistantService.waitUntilVectorStoreReady(vectorStoreId)
         log.info("Vector store is ready.")
         saveUserSetting(vectorStoreId, null)
-        return vectorStoreId
+        return [vectorStoreId: vectorStoreId, files: files ]
     }
 
     @PostMapping("/chat")
@@ -180,7 +214,6 @@ The response should be structured and scannable: Detailed descriptions that use 
     UserChatSettings loadUserChatSetting() {
         String userId = userInfoService.getCurrentUserId()
         SettingsResult genProjSettings = settingsService.getUserSetting(userId, SETTING, SETTING_GROUP, false)
-        JsonSlurper jsonSlurper = new JsonSlurper()
         return genProjSettings ? jsonSlurper.parseText(genProjSettings.value) as UserChatSettings : null
     }
 

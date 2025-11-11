@@ -295,6 +295,9 @@ const finalMsgSeverity = (historyItem) => historyItem.failedToGenerate ? 'error'
           <div class="font-semibold">{{ selectedModel.model }}</div>
           <skills-button icon="fa-solid fa-gear" size="small" @click="showModelSettings = !showModelSettings" />
         </div>
+        <slot name="onTop">
+
+        </slot>
         <div v-if="showModelSettings" class="mb-5">
           <Fieldset legend="Settings">
             <div class="flex flex-col gap-5">

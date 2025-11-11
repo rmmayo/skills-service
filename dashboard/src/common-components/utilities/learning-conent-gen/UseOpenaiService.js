@@ -104,10 +104,16 @@ export const useOpenaiService = () => {
       return axios.post(`/openai/chat`, { question: userInstructions }) ;
     }
 
+    const getKnowledgeStoreFiles = ()  => {
+        return axios.get(`/openai/storeFiles`)
+            .then((response) => response.data);
+    }
+
     return {
         prompt,
         cancelCurrentPrompt,
         getAvailableModels,
         chat: chat,
+        getKnowledgeStoreFiles,
     }
 }

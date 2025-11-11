@@ -14,6 +14,7 @@ import { useInstructionGenerator } from '@/common-components/utilities/learning-
 import { useDescriptionValidatorService } from '@/common-components/validators/UseDescriptionValidatorService.js'
 import { useAppConfig } from '@/common-components/stores/UseAppConfig.js'
 import AiPromptDialog from '@/common-components/utilities/learning-conent-gen/AiPromptDialog.vue'
+import AiKnowledgeStore from "@/common-components/utilities/learning-conent-gen/AiKnowledgeStore.vue";
 
 const model = defineModel()
 const props = defineProps({
@@ -140,6 +141,9 @@ const handleAddPrefix = (historyItem, missingPrefix) => {
     :community-value="communityValue"
     :generateProject="true"
     @use-generated="useGenerated">
+    <template #onTop>
+      <ai-knowledge-store />
+    </template>
     <template #generatedValue="{ historyItem }">
       <markdown-text
         :text="historyItem.generatedValue"

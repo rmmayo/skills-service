@@ -189,6 +189,7 @@ final class MultipartRequestMatcher implements RequestMatcher {
     private final HashSet<String> allowedMethods = new HashSet<>(Arrays.asList("GET", "HEAD", "TRACE", "OPTIONS"))
     private final OrRequestMatcher pathMatcher = new OrRequestMatcher(
             new AntPathRequestMatcher("**/upload"),
+            new AntPathRequestMatcher("**/uploadAndStore"),
             new AntPathRequestMatcher("/admin/*/*/*/*/video"),
             new AntPathRequestMatcher("/admin/*/*/*/*/slides"),
             new AntPathRequestMatcher("/admin/*/*/slides"),

@@ -85,7 +85,7 @@ class OpenAIAssistantService {
                 .block()
     }
 
-    String uploadFile(File file) {
+    Map uploadFile(File file) {
         return uploadFile(new FileSystemResource(file))
     }
 
@@ -93,7 +93,7 @@ class OpenAIAssistantService {
      * Upload a single file using the Files API with purpose 'user_data'.
      * Docs: File inputs & Files API.
      */
-    String uploadFile(Resource resource) {
+    Map uploadFile(Resource resource) {
         def mb = new MultipartBodyBuilder()
         mb.part("purpose", "user_data")
         mb.part("file", resource).filename(resource.filename)
@@ -106,7 +106,7 @@ class OpenAIAssistantService {
                 .bodyToMono(Map)
                 .block()
 
-        return (String) resp.get("id")
+        return resp
     }
 
     /**
