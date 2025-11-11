@@ -94,18 +94,14 @@ const close = () => {
 }
 
 const isRootUser = computed(() => accessState.isRoot)
-const generateProject = async (values) => {
+const uploadTrainingDocuments = async (values) => {
   const formData = new FormData()
   for (let i = 0; i < generateProjConf.value.files.length; i++) {
     // The name 'files' must match the @RequestParam name in the Spring controller
     formData.append('files', generateProjConf.value.files[i])
   }
-  // const trainingAudience = 'students looking to improve their skills'
-  const trainingAudience = 'intermediate to advanced pickleball players looking to improve their skills'
-  const instructions = instructionsGenerator.generatedProjectInstructions(trainingAudience)
-  formData.append('question', instructions)
 
-  const response = await uploadAndAsk(formData)
+  const response = await uploadAndStore(formData)
   console.log(`generated project response`, response?.data)
   const generatedProject = extractJsonFromString(response?.data)
   if (initialValueForEnableProtectedUserCommunity) {
@@ -113,12 +109,12 @@ const generateProject = async (values) => {
       initialValueForEnableProtectedUserCommunity
   }
 
-  emit('project-generated', generatedProject)
+  // emit('project-generated', generatedProject)
   return Promise.resolve()
 }
 
-const uploadAndAsk = async (formData) => {
-  const endpoint = '/openai/uploadAndAsk'
+const uploadAndStore = async (formData) => {
+  const endpoint = '/openai/uploadAndStore'
   return FileUploadService.asyncUpload(endpoint, formData)
 }
 const extractJsonFromString = (text) => {
@@ -183,7 +179,7 @@ const onFileSelectedEvent = (selectEvent) => {
     :ok-button-disabled="!generateProjConf.hostedFileName"
     @saved="onGenerateProjected"
     @close="close"
-    :save-data-function="generateProject">
+    :save-data-function="uploadTrainingDocuments">
     <template #default>
       <community-protection-controls
         v-model:enable-protected-user-community="enableProtectedUserCommunity"

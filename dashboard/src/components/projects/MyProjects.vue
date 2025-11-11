@@ -36,6 +36,7 @@ import LengthyOperationProgressBarModal from '@/components/utils/modal/LengthyOp
 import { useAdminProjectsState } from '@/stores/UseAdminProjectsState.js'
 import { useLog } from '@/components/utils/misc/useLog.js'
 import GenerateProjectService from "@/components/projects/GenerateProjectService.js";
+import GenerateProjectChatDialog from '@/components/projects/GenerateProjectChatDialog.vue'
 
 const appConfig = useAppConfig()
 const accessState = useAccessState()
@@ -64,6 +65,7 @@ const generateProject = ref({
   generating: false,
   show: false
 })
+const showGenerateProjectChatDialog = ref(false)
 const showSearchProjectModal = ref(false)
 const sortOrder = ref({
   loading: false,
@@ -319,13 +321,19 @@ const generateNewProject = () => {
           ref="generateProjButton"
           @click="generateNewProject"
           outlined
-          class="ml-2 text-primary bg-primary-contrast"
+          class="mx-2 text-primary bg-primary-contrast"
           size="small"
           :disabled="addProjectDisabled"
           data-cy="generateProjectButton"
           aria-label="Generate new Project from SkillTree AI JSON"
           :track-for-focus="true"
           role="button" />
+
+      <SkillsButton icon="fa-solid fa-wand-magic-sparkles"
+                    label="AI Chat"
+                    size="small"
+                    data-cy="aiButton"
+                    @click="showGenerateProjectChatDialog = true"/>
 
       <div v-if="addProjectDisabled" class="mt-1">
         <InlineMessage severity="warn"
@@ -394,6 +402,11 @@ const generateNewProject = () => {
         @project-generated="projectGenerated"
         @close="generateProject.show = false"
         :enable-return-focus="true" />
+
+    <generate-project-chat-dialog
+      v-if="showGenerateProjectChatDialog"
+      ref="generateDescriptionDialogRef"
+      v-model="showGenerateProjectChatDialog" />
 
     <pin-projects v-if="showSearchProjectModal" v-model="showSearchProjectModal"
                   @done="pinModalClosed" />

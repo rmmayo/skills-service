@@ -50,6 +50,10 @@ const props = defineProps({
     type: String,
     default: null
   },
+  generateProject: {
+    type: Boolean,
+    default: false
+  },
   generationCompletedMsg: {
     type: String,
     default: 'Take a look at what I came up with! Please review it and let me know if you need any changes.'
@@ -92,7 +96,17 @@ const startGeneration = () => {
 
   isGenerating.value = true
   addChatItem(props.generationStartedMsg, ChatRole.ASSISTANT, true)
-  genWithStreaming(promptInstructions)
+  if (props.generateProject) {
+    openaiService.chat(promptInstructions)
+      .then((response) => {
+        appendGeneratedToLastChatItem(response.data.response)
+        setFinalMsgToLastChatItem(props.generationCompletedMsg)
+        isGenerating.value = false
+        focusOnInstructionsInput()
+      })
+  } else {
+    genWithStreaming(promptInstructions)
+  }
 }
 defineExpose({
   addWelcomeMsg,

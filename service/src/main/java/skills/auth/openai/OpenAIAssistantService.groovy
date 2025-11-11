@@ -82,6 +82,47 @@ class OpenAIAssistantService {
                 .block()
     }
 
+    /** STEP 1: Create a vector store and upload the file */
+    String uploadFileToVectorStore(File file) {
+        // 1️⃣ Upload the file normally
+        def resource = new FileSystemResource(file)
+        def multipart = BodyInserters
+                .fromMultipartData("file", resource)
+                .with("purpose", "assistants")
+
+        def uploadedFile = webClient.post()
+                .uri("/files")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(multipart)
+                .retrieve()
+                .bodyToMono(Map)
+                .block()
+
+        def fileId = uploadedFile.id
+
+        // 2️⃣ Create a new vector store
+        def vectorStore = webClient.post()
+                .uri("/vector_stores")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromValue([name: "assistant-docs"]))
+                .retrieve()
+                .bodyToMono(Map)
+                .block()
+
+        def vectorStoreId = vectorStore.id
+
+        // 3️⃣ Attach the uploaded file to that store via JSON
+        webClient.post()
+                .uri("/vector_stores/${vectorStoreId}/files")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromValue([file_id: fileId]))
+                .retrieve()
+                .bodyToMono(Map)
+                .block()
+
+        log.info("Files uploaded to vector store [{}]", vectorStoreId)
+        return vectorStoreId
+    }
 
     /** STEP 1: Create a vector store and upload the files */
     String uploadFilesToVectorStore(List<File> files) {
@@ -103,6 +144,7 @@ class OpenAIAssistantService {
 
             String fileId = uploadedFile.id
             fileIds.add(fileId)
+            log.info("File [{}] uploaded to openai with file id [{}]", file.name, fileId)
         }
 
         // 2️⃣ Create a new vector store
@@ -126,7 +168,7 @@ class OpenAIAssistantService {
                     .bodyToMono(Map)
                     .block()
 
-            log.info("File uploaded to vector store [{}]", vectorStoreId)
+            log.info("File [{}] attached to vector store [{}]", fileId, vectorStoreId)
         }
         return vectorStoreId
     }
@@ -230,5 +272,64 @@ class OpenAIAssistantService {
                     def content = assistantMsg?.content?.getAt(0)?.text?.value
                     content ?: '(no assistant response)'
                 }
+    }
+
+    /**
+     * Create a new vector store for uploaded files.
+     */
+    String createVectorStore() {
+        def body = [name: "knowledge-base"]
+        def vectorStore = webClient.post()
+                .uri("/vector_stores")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(Map)
+                .block()
+
+        def vectorStoreId = vectorStore.id
+        log.info("Created vector store [{}]", vectorStoreId)
+        return vectorStoreId
+    }
+
+    /**
+     * Upload a file into the existing vector store.
+     */
+    Mono<Map>   uploadFile(File file, String vectorStoreId) {
+        if (!vectorStoreId) {
+            throw new IllegalStateException("Vector store not created. Call /vectorstore first.")
+        }
+
+        webClient.post()
+                .uri("/vector_stores/${vectorStoreId}/files")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData("file", file))
+                .retrieve()
+                .bodyToMono(Map)
+    }
+
+    /**
+     * Ask a question about the vector store
+     */
+    Mono<Map> askQuestion(String question, String vectorStoreId) {
+        if (!vectorStoreId) {
+            throw new IllegalStateException("Vector store not created yet.")
+        }
+
+        def body = [
+                model: "gpt-4.1-mini",
+                input: question,
+                tools: [[
+                                type: "file_search",
+                                vector_store_ids: [vectorStoreId]
+                        ]]
+        ]
+
+        webClient.post()
+                .uri("/responses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(Map)
     }
 }

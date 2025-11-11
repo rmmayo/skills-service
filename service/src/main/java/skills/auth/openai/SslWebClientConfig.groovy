@@ -128,7 +128,7 @@ class SslWebClientConfig {
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer ${openAiKey}")
-                .defaultHeader("OpenAI-Beta", "assistants=v2")
+//                .defaultHeader("OpenAI-Beta", "assistants=v2")
 
         if (baseUrl) {
             builder.baseUrl(baseUrl)

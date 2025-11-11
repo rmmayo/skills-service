@@ -100,9 +100,14 @@ export const useOpenaiService = () => {
       return axios.get(`/openai/models`).then((response) => response.data);
     }
 
+    const chat = (userInstructions) => {
+      return axios.post(`/openai/chat`, { question: userInstructions }) ;
+    }
+
     return {
         prompt,
         cancelCurrentPrompt,
-        getAvailableModels
+        getAvailableModels,
+        chat: chat,
     }
 }
