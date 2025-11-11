@@ -18,6 +18,7 @@ import org.springframework.http.codec.ServerSentEvent
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.BodyInserters
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.WebClientResponseException
 import reactor.core.publisher.Flux
 import reactor.core.publisher.SynchronousSink
 
@@ -214,6 +215,14 @@ class OpenAIAssistantService {
             .bodyValue(body)
             .retrieve()
             .bodyToFlux(typeRef)
+            .onErrorResume(WebClientResponseException.class, ex -> {
+                log.error("WebClient error: Status={}, Body={}", ex.getStatusCode(), ex.getResponseBodyAsString(), ex);
+                return Flux.error(new RuntimeException("Failed to process OpenAI streaming response", ex));
+            })
+            .onErrorResume(Throwable.class, ex -> {
+                log.error("Unexpected error during OpenAI streaming", ex);
+                return Flux.error(new RuntimeException("Unexpected error during streaming", ex));
+            })
             .handle { ServerSentEvent<String> sse, SynchronousSink<StreamChunk> sink ->
                 String event = sse.event()
                 String data  = sse.data()
