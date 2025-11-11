@@ -30,8 +30,6 @@ import reactor.core.publisher.Flux
 import skills.auth.UserInfoService
 import skills.auth.openai.GenDescRequest
 import skills.auth.openai.OpenAIAssistantService
-import skills.auth.openai.OpenAIAssistantService2
-import skills.auth.openai.OpenAIAssistantService3
 import skills.auth.openai.OpenAIService
 import skills.controller.exceptions.SkillsValidator
 import skills.controller.request.model.UserSettingsRequest
@@ -50,12 +48,6 @@ class OpenAiController {
 
     @Autowired
     OpenAIAssistantService openAIAssistantService
-
-    @Autowired
-    OpenAIAssistantService2 openAIAssistantService2
-
-    @Autowired
-    OpenAIAssistantService3 openAIAssistantService3
 
     @Value("classpath:SkillTreeConcepts.pdf")
     Resource skillTreeConceptsResourceFile;
@@ -121,14 +113,14 @@ The response should be structured and scannable: Detailed descriptions that use 
 
         // upload all files and collect the fileIds
         log.info("Uploading [{}] file(s)...", filesToUpload.size())
-        List<String> fileIds = filesToUpload.collect { openAIAssistantService3.uploadFile(it) }
+        List<String> fileIds = filesToUpload.collect { openAIAssistantService.uploadFile(it) }
         log.info("Uploaded file IDs: [{}]", fileIds)
 
         // Create vector store & attach files, then wait for ingestion
-        String vectorStoreId = openAIAssistantService3.createVectorStore("Synergy SkillTree Curriculum Development Store")
+        String vectorStoreId = openAIAssistantService.createVectorStore("Synergy SkillTree Curriculum Development Store")
         log.info("Vector store created [{}]", vectorStoreId)
-        openAIAssistantService3.attachFilesToVectorStore(vectorStoreId, fileIds)
-        openAIAssistantService3.waitUntilVectorStoreReady(vectorStoreId)
+        openAIAssistantService.attachFilesToVectorStore(vectorStoreId, fileIds)
+        openAIAssistantService.waitUntilVectorStoreReady(vectorStoreId)
         log.info("Vector store is ready.")
         saveUserSetting(vectorStoreId, null)
         return vectorStoreId
@@ -149,7 +141,7 @@ The response should be structured and scannable: Detailed descriptions that use 
         log.debug("\nQuestion: [{}]", q1)
         messages << [role: "user", content: [[type: "input_text", text: q1]]]
 
-        def a1 = openAIAssistantService3.askWithFileSearch(chatRequest.vectorStoreId, messages)
+        def a1 = openAIAssistantService.askWithFileSearch(chatRequest.vectorStoreId, messages)
         log.info("\nAnswer:\n[{}]", a1)
         return a1
     }
@@ -162,12 +154,12 @@ The response should be structured and scannable: Detailed descriptions that use 
         if (!userChatSettings.conversationId) {
             // 1) Create a server-side conversation (OpenAI will track the context)
             initialSystemInstructions = systemInstructions
-            conversationId = openAIAssistantService3.createConversation()
+            conversationId = openAIAssistantService.createConversation()
             saveUserSetting(userChatSettings.vectorStoreId, conversationId)
             log.info("created new conversation: [{}]", conversationId)
         }
 
-        def a1 = openAIAssistantService3.askWithServerContext(conversationId, userChatSettings.vectorStoreId, initialSystemInstructions, chatRequest.question)
+        def a1 = openAIAssistantService.askWithServerContext(conversationId, userChatSettings.vectorStoreId, initialSystemInstructions, chatRequest.question)
         log.debug("\nAnswer:\n[{}]", a1)
         return new ChatResponse(response: a1.text, conversationId: conversationId, vectorStoreId: userChatSettings.vectorStoreId)
     }

@@ -1,11 +1,16 @@
 package skills.auth.openai
 
+import groovy.json.JsonSlurper
+import groovy.transform.Canonical
+import groovy.transform.ToString
 import groovy.util.logging.Slf4j
 import jakarta.annotation.PostConstruct
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.io.FileSystemResource
+import org.springframework.core.io.Resource
 import org.springframework.http.MediaType
+import org.springframework.http.client.MultipartBodyBuilder
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.BodyInserters
 import org.springframework.web.reactive.function.client.WebClient
@@ -17,23 +22,17 @@ import java.time.Duration
 @Slf4j
 class OpenAIAssistantService {
 
+
+    private final JsonSlurper jsonSlurper = new JsonSlurper()
+
+    private String vectorStoreId
+    private String assistantId
+    private String threadId
+
+    private static final String BASE_URL = "https://api.openai.com/v1"
+
     @Value('#{"${skills.openai.host:null}"}')
     String openAiHost
-
-    @Value('#{"${skills.openai.completionsEndpoint:/v1/chat/completions}"}')
-    String completionsEndpoint
-
-    @Value('#{"${skills.openai.modelsEndpoint:/v1/models}"}')
-    String modelsEndpoint
-
-    @Value('#{"${skills.openai.filesEndpoint:/v1/files}"}')
-    String filesEndpoint
-
-    @Value('#{"${skills.openai.assistantsEndpoint:/v1/assistants}"}')
-    String assistantsEndpoint
-
-    @Value('#{"${skills.openai.threadsEndpoint:/v1/beta/threads}"}')
-    String threadsEndpoint
 
     @Value('#{"${skills.openai.key:null}"}')
     String openAiKey
@@ -82,254 +81,200 @@ class OpenAIAssistantService {
                 .block()
     }
 
-    /** STEP 1: Create a vector store and upload the file */
-    String uploadFileToVectorStore(File file) {
-        // 1️⃣ Upload the file normally
-        def resource = new FileSystemResource(file)
-        def multipart = BodyInserters
-                .fromMultipartData("file", resource)
-                .with("purpose", "assistants")
+    String uploadFile(File file) {
+        return uploadFile(new FileSystemResource(file))
+    }
 
-        def uploadedFile = webClient.post()
+    /**
+     * Upload a single file using the Files API with purpose 'user_data'.
+     * Docs: File inputs & Files API.
+     */
+    String uploadFile(Resource resource) {
+        def mb = new MultipartBodyBuilder()
+        mb.part("purpose", "user_data")
+        mb.part("file", resource).filename(resource.filename)
+
+        Map resp = webClient.post()
                 .uri("/files")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(multipart)
+                .body(BodyInserters.fromMultipartData(mb.build()))
                 .retrieve()
                 .bodyToMono(Map)
                 .block()
 
-        def fileId = uploadedFile.id
-
-        // 2️⃣ Create a new vector store
-        def vectorStore = webClient.post()
-                .uri("/vector_stores")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue([name: "assistant-docs"]))
-                .retrieve()
-                .bodyToMono(Map)
-                .block()
-
-        def vectorStoreId = vectorStore.id
-
-        // 3️⃣ Attach the uploaded file to that store via JSON
-        webClient.post()
-                .uri("/vector_stores/${vectorStoreId}/files")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue([file_id: fileId]))
-                .retrieve()
-                .bodyToMono(Map)
-                .block()
-
-        log.info("Files uploaded to vector store [{}]", vectorStoreId)
-        return vectorStoreId
-    }
-
-    /** STEP 1: Create a vector store and upload the files */
-    String uploadFilesToVectorStore(List<File> files) {
-        List<String> fileIds = []
-        for (File file : files) {
-            // 1️⃣ Upload the file normally
-            def resource = new FileSystemResource(file)
-            def multipart = BodyInserters
-                    .fromMultipartData("file", resource)
-                    .with("purpose", "assistants")
-
-            def uploadedFile = webClient.post()
-                    .uri("/files")
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(multipart)
-                    .retrieve()
-                    .bodyToMono(Map)
-                    .block()
-
-            String fileId = uploadedFile.id
-            fileIds.add(fileId)
-            log.info("File [{}] uploaded to openai with file id [{}]", file.name, fileId)
-        }
-
-        // 2️⃣ Create a new vector store
-        def vectorStore = webClient.post()
-                .uri("/vector_stores")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue([name: "assistant-docs"]))
-                .retrieve()
-                .bodyToMono(Map)
-                .block()
-
-        def vectorStoreId = vectorStore.id
-
-        // 3️⃣ Attach the uploaded files to that store via JSON
-        for (String fileId : fileIds) {
-            webClient.post()
-                    .uri("/vector_stores/${vectorStoreId}/files")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(BodyInserters.fromValue([file_id: fileId]))
-                    .retrieve()
-                    .bodyToMono(Map)
-                    .block()
-
-            log.info("File [{}] attached to vector store [{}]", fileId, vectorStoreId)
-        }
-        return vectorStoreId
-    }
-
-    /** STEP 2: Create the Assistant linked to that vector store */
-    Mono<String> createAssistant(String name, String instructions, String model, String vectorStoreId) {
-        def body = [
-                name          : name,
-                instructions  : instructions,
-                model         : model,
-                tools         : [[type: "file_search"]],
-                tool_resources: [
-                        file_search: [
-                                vector_store_ids: [vectorStoreId]
-                        ]
-                ]
-        ]
-
-        log.info("Creating Assistant linked to vector store [{}]", vectorStoreId)
-        return webClient.post()
-                .uri('/assistants')
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue(body))
-                .retrieve()
-                .bodyToMono(Map)
-                .map { it.id as String }
-    }
-
-    /** STEP 3: Create a new conversation thread */
-    Mono<String> createThread() {
-
-        log.info("Creating new conversation thread")
-        return webClient.post()
-                .uri('/threads')
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue([:]))
-                .retrieve()
-                .bodyToMono(Map)
-                .map { it.id as String }
-    }
-
-    /** STEP 4: Add a user message to the thread */
-    Mono<String> addUserMessage(String threadId, String content) {
-        def body = [role: 'user', content: content]
-        log.info("Adding user message [{}] to conversation thread [{}]", content, threadId)
-        return webClient.post()
-                .uri("/threads/${threadId}/messages")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue(body))
-                .retrieve()
-                .bodyToMono(Map)
-                .map { it.id as String }
-    }
-
-    /** STEP 5: Run the Assistant on that thread */
-    Mono<String> runAssistant(String threadId, String assistantId) {
-        def body = [assistant_id: assistantId]
-
-        log.info("Running assistant [{}] on conversation thread [{}]", assistantId, threadId)
-        return webClient.post()
-                .uri("/threads/${threadId}/runs")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue(body))
-                .retrieve()
-                .bodyToMono(Map)
-                .map { it.id as String }
-    }
-
-    /** STEP 6: Poll the run until it completes */
-    Mono<String> pollRunUntilComplete(String threadId, String runId) {
-        log.info("Polling conversation thread [{}] for run [{}]", threadId, runId)
-        return webClient.get()
-                .uri("/threads/${threadId}/runs/${runId}")
-                .retrieve()
-                .bodyToMono(Map)
-                .delayElement(Duration.ofSeconds(1))
-                .flatMap { Map run ->
-                    if (run.status == 'completed') {
-                        return Mono.just('completed');
-                    } else if (run.status == 'failed') {
-                        String errorMessage = "Failed while polling external service.  [${run?.last_error}]"
-                        log.error(errorMessage)
-                        throw new RuntimeException(errorMessage)
-                    }
-                    else {
-                        pollRunUntilComplete(threadId, runId)
-                    }
-                }
-    }
-
-    /** STEP 7: Retrieve the assistant’s final message */
-    Mono<String> getAssistantResponse(String threadId) {
-        log.info("Retrieving assistant's final message on conversation thread [{}]", threadId)
-        return webClient.get()
-                .uri("/threads/${threadId}/messages")
-                .retrieve()
-                .bodyToMono(Map)
-                .map { Map m ->
-                    def messages = m.data as List<Map>
-                    def assistantMsg = messages.find { it.role == 'assistant' }
-                    def content = assistantMsg?.content?.getAt(0)?.text?.value
-                    content ?: '(no assistant response)'
-                }
+        return (String) resp.get("id")
     }
 
     /**
-     * Create a new vector store for uploaded files.
+     * Create a vector store to power file_search.
+     * Docs: Vector stores reference.
      */
-    String createVectorStore() {
-        def body = [name: "knowledge-base"]
-        def vectorStore = webClient.post()
+    String createVectorStore(String name) {
+        Map body = [name: name]
+        Map resp = webClient.post()
                 .uri("/vector_stores")
-                .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(body)
                 .retrieve()
                 .bodyToMono(Map)
                 .block()
-
-        def vectorStoreId = vectorStore.id
-        log.info("Created vector store [{}]", vectorStoreId)
-        return vectorStoreId
+        return (String) resp.get("id")
     }
 
     /**
-     * Upload a file into the existing vector store.
+     * Attach multiple file IDs to the vector store in a single batch.
+     * Docs: vector-stores file batches.
      */
-    Mono<Map>   uploadFile(File file, String vectorStoreId) {
-        if (!vectorStoreId) {
-            throw new IllegalStateException("Vector store not created. Call /vectorstore first.")
-        }
-
+    void attachFilesToVectorStore(String vectorStoreId, List<String> fileIds) {
+        Map body = [file_ids: fileIds]
         webClient.post()
-                .uri("/vector_stores/${vectorStoreId}/files")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData("file", file))
+                .uri("/vector_stores/${vectorStoreId}/file_batches")
+                .bodyValue(body)
                 .retrieve()
                 .bodyToMono(Map)
+                .block()
     }
 
     /**
-     * Ask a question about the vector store
+     * Poll until all files in the vector store are processed (not in_progress).
+     * Docs suggest polling until ingestion is complete before querying.
      */
-    Mono<Map> askQuestion(String question, String vectorStoreId) {
-        if (!vectorStoreId) {
-            throw new IllegalStateException("Vector store not created yet.")
-        }
+    void waitUntilVectorStoreReady(String vectorStoreId) {
+        while (true) {
+            Map listing = webClient.get()
+                    .uri { b -> b.path("/vector_stores/${vectorStoreId}/files").queryParam("limit", "100").build() }
+                    .retrieve()
+                    .bodyToMono(Map)
+                    .block()
 
-        def body = [
-                model: "gpt-4.1-mini",
-                input: question,
-                tools: [[
-                                type: "file_search",
-                                vector_store_ids: [vectorStoreId]
-                        ]]
+            List<Map> files = (List<Map>) listing.get("data")
+            if (files != null && files.every { f -> !"in_progress".equalsIgnoreCase((String) f.get("status")) }) {
+                return
+            }
+            Thread.sleep(1500L)
+        }
+    }
+
+    /**
+     * Ask a question using the Responses API with the file_search tool.
+     * The vector store is supplied via tool_resources.file_search.vector_store_ids.
+     * Docs: Responses API + file_search guide.
+     */
+    String askWithFileSearch(String vectorStoreId, List<Map> messages) {
+        Map body = [
+                model: "gpt-5",
+                input: messages,
+                tools: [[type: "file_search", vector_store_ids: [vectorStoreId]]]
+                // (optional) response_format / temperature / max_output_tokens, etc…
         ]
 
-        webClient.post()
+        Map resp = webClient.post()
                 .uri("/responses")
-                .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(body)
                 .retrieve()
                 .bodyToMono(Map)
+                .block()
+
+        return extractText(resp)
+    }
+
+    /** Create a persistent conversation to let OpenAI manage multi-turn context. */
+    String createConversation() {
+        Map resp = webClient.post()
+                .uri("/conversations")
+                .bodyValue([:]) // empty payload is fine
+                .retrieve()
+                .bodyToMono(Map)
+                .block()
+        return (String) resp.get("id")
+    }
+
+    /**
+     * Ask a question with OpenAI-managed context.
+     * - Keep using the same conversationId (server-side state).
+     * - Configure file_search by putting vector_store_ids on the tool item.
+     */
+    Response askWithServerContext(String conversationId, String vectorStoreId, String maybeSystemInstruction, String userQuestion) {
+        def inputItems = []
+        if (maybeSystemInstruction) {
+            inputItems << [
+                    role   : "system",
+                    content: [[type: "input_text", text: maybeSystemInstruction]]
+            ]
+        }
+        inputItems << [
+                role   : "user",
+                content: [[type: "input_text", text: userQuestion]]
+        ]
+
+        Map body = [
+                model       : "gpt-5",
+                store       : true,                // persist context on the server
+                conversation: conversationId,      // keep using the same conversation
+                input       : inputItems,
+                tools       : [[
+                                       type            : "file_search",
+                                       vector_store_ids: [vectorStoreId]
+                               ]]
+        ]
+
+        Map resp = webClient.post()
+                .uri("/responses")
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(Map)
+                .block()
+
+        return new Response(
+                id: (String) resp.get("id"),
+                text: extractText(resp)
+        )
+    }
+
+    /**
+     * Tolerant extractor for Responses API payloads:
+     * 1) Prefer top-level 'output_text' if present (many SDKs expose this).
+     * 2) Otherwise, concatenate any output_text or content[].text segments.
+     */
+    private static String extractText(Map resp) {
+        if (resp == null) return ""
+        def outputText = resp.get("output_text")
+        if (outputText instanceof String && !outputText.isBlank()) {
+            return (String) outputText
+        }
+        // Fall back to walking output[] -> content[] -> text
+        StringBuilder sb = new StringBuilder()
+        def outputs = resp.get("output")
+        if (outputs instanceof List) {
+            outputs.each { o ->
+                def content = (o instanceof Map) ? o.get("content") : null
+                if (content instanceof List) {
+                    content.each { c ->
+                        if (c instanceof Map) {
+                            def type = c.get("type")
+                            def text = c.get("text")
+                            if (("output_text" == type || "input_text" == type) && text instanceof String) {
+                                sb.append(text).append("\n")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return sb.toString().trim()
+    }
+
+    @Canonical
+    @ToString
+    static class OpenAIAssistant {
+        String vectorStoreId
+        String assistantId
+        String threadId
+    }
+
+    @Canonical
+    @ToString
+    static class Response {
+        String id
+        String text
     }
 }
