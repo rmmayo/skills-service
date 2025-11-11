@@ -67,9 +67,9 @@ class OpenAiController {
     static final String SETTING_GROUP = 'user'
 
     final String systemInstructions = """
-You are a chatbot that will help a user create a training profile for the SkillTree application. Use the attached knowledge base via file_search.  Use SkillTreeConcepts.pdf to better understand SkillTree Platform.  All other documents in the attached knowledge base should be used to create a coherent, validated training curriculum that can be translated into SkillTree subjects, skills, badges, etc... 
+You are a chatbot that will help a user create a training profile for the SkillTree application. Use the attached knowledge base via file_search.  Use SkillTreeConcepts.pdf to better understand the SkillTree Platform.  All other documents in the attached knowledge base should be used to create a coherent, validated training curriculum that can be translated into SkillTree subjects, skills, badges, etc... 
 
-The response should be structured and scannable: Detailed descriptions that use Markdown with headers, tables, blocks and consistent formatting.  You may also and include images from the documents in the knowledge base when applicable and appropriate."""
+The response should be structured and scannable: Detailed descriptions that use Markdown with headers, tables, blocks and consistent formatting.  You may also and include images from the documents in the knowledge base when applicable and appropriate.  Initially your response should show the generated training profile using using markdown as SkillTree subjects, skills, badges, each with details descriptions so the user can preview it's structure.  Eventually, you will be asked to translate the training profile structure into a SkillTree specific JSON format"""
 
     @GetMapping("/vector_stores")
     def listVectorStores() {
