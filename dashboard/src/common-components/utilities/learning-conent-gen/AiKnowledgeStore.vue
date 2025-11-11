@@ -36,7 +36,7 @@ const onRemoveTemplatingFile = (file, removeFileCallback, index) => {
 
 const loadKnowledgeStore = () => {
   return openAiService.getKnowledgeStoreFiles().then((response) => {
-    currentKnowledgeFiles.value = response
+    currentKnowledgeFiles.value = response.filter((it) => it.filename !== 'SkillTreeConcepts.pdf')
     console.log('loaded knowledge store')
   })
 }
@@ -69,7 +69,7 @@ const uploadEvent = (callback) => {
   incrementProgress()
   return uploadTrainingDocuments().then((response) => {
     totalSizePercent.value = 100;
-    currentKnowledgeFiles.value.push(...response.files)
+    currentKnowledgeFiles.value.push(...response.files.filter((it) => it.filename !== 'SkillTreeConcepts.pdf'))
     files.value = []
     showFileUpload.value = false
     totalSizePercent.value = 0
