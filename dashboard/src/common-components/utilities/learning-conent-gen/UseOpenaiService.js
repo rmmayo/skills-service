@@ -19,10 +19,10 @@ export const useOpenaiService = () => {
 
     let currentRequestController = null;
 
-    const prompt = async (instructions, onChunk, onComplete, onError) => {
+    const prompt = async (instructions, onChunk, onComplete, onError, endpoint) => {
         try {
             currentRequestController = new AbortController();
-            const response = await fetch(`/openai/stream/description`, {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -1,5 +1,7 @@
 package skills.auth.openai
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import groovy.json.JsonSlurper
 import groovy.transform.Canonical
 import groovy.transform.ToString
@@ -7,16 +9,17 @@ import groovy.util.logging.Slf4j
 import jakarta.annotation.PostConstruct
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.core.ParameterizedTypeReference
 import org.springframework.core.io.FileSystemResource
 import org.springframework.core.io.Resource
 import org.springframework.http.MediaType
 import org.springframework.http.client.MultipartBodyBuilder
+import org.springframework.http.codec.ServerSentEvent
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.BodyInserters
 import org.springframework.web.reactive.function.client.WebClient
-import reactor.core.publisher.Mono
-
-import java.time.Duration
+import reactor.core.publisher.Flux
+import reactor.core.publisher.SynchronousSink
 
 @Service
 @Slf4j
@@ -163,6 +166,102 @@ class OpenAIAssistantService {
                 .bodyToMono(Map)
                 .block()
         return (String) resp.get("id")
+    }
+
+    /**
+     * Streams the model's output text using SSE.
+     * Emits StreamChunk(type: "delta", text: "...") for each text token,
+     * and a final StreamChunk(type: "completed", responseId: "...") when done.
+     */
+    Flux<StreamChunk> streamAskWithServerContext(
+            String conversationId,
+            String vectorStoreId,
+            String maybeSystemInstruction,
+            String userQuestion
+    ) {
+        def inputItems = []
+        if (maybeSystemInstruction) {
+            inputItems << [
+                    role   : "system",
+                    content: [[type: "input_text", text: maybeSystemInstruction]]
+            ]
+        }
+        inputItems << [
+                role   : "user",
+                content: [[type: "input_text", text: userQuestion]]
+        ]
+
+        Map body = [
+                model        : "gpt-5",
+                store        : true,                 // Keep context on the server
+                conversation : conversationId,       // Bind to the same conversation
+                input        : inputItems,
+                tools        : [[
+                                        type            : "file_search",
+                                        vector_store_ids: [vectorStoreId]
+                                ]],
+                stream       : true                  // 🔑 enable SSE streaming
+        ]
+
+        def typeRef = new ParameterizedTypeReference<ServerSentEvent<String>>() {}
+        def mapper  = new ObjectMapper()
+
+        return webClient.post()
+            .uri("/responses")
+            .headers { h ->
+                h.setAccept([MediaType.TEXT_EVENT_STREAM])
+            }
+            .bodyValue(body)
+            .retrieve()
+            .bodyToFlux(typeRef)
+            .handle { ServerSentEvent<String> sse, SynchronousSink<StreamChunk> sink ->
+                String event = sse.event()
+                String data  = sse.data()
+                if (data == null) return
+                JsonNode node = mapper.readTree(data)
+
+                // Error handling
+                if ("response.error".equals(event)) {
+                    String msg = node.path("error").path("message").asText("Unknown streaming error")
+                    sink.error(new RuntimeException(msg)); return
+                }
+
+                // Token-by-token text
+                if ("response.output_text.delta".equals(event)) {
+                    String delta = node.path("delta").asText("")
+                    delta = delta.replaceAll('\\n', '<<newline>>')
+                    log.debug("Response: [{}] from json=[{}]", delta, node)
+                    if (!delta.isEmpty()) sink.next(new StreamChunk(type: "delta", text: delta))
+                    return
+                }
+
+                // Some models emit a final consolidated text chunk
+//                if ("response.output_text.done".equals(event)) {
+//                    String text = node.path("text").asText("")
+//                    text = text.replaceAll('\\n', '<<newline>>')
+//                    log.debug("Response: [{}] from json=[{}]", text, node)
+//                    if (!text.isEmpty()) sink.next(new StreamChunk(type: "delta", text: text))
+//                    return
+//                }
+
+                // Stream finished
+                if ("response.completed".equals(event)) {
+                    // Response id may appear either at root or under "response"
+                    String respId = node.path("response").path("id").asText(null)
+                    if (!respId) respId = node.path("id").asText(null)
+                    sink.next(new StreamChunk(type: "completed", responseId: respId, text: '[DONE]'))
+                    sink.complete()
+                }
+
+                // Ignore other event types (tool calls, citations, etc) for brevity
+            }
+    }
+
+    /** Simple DTO for streamed events */
+    static class StreamChunk {
+        String type    // "delta" | "completed"
+        String text    // present when type=="delta"
+        String responseId // present when type=="completed"
     }
 
     /**

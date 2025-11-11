@@ -144,6 +144,21 @@ The response should be structured and scannable: Detailed descriptions that use 
         return new ChatResponse(response: a1.text, conversationId: conversationId, vectorStoreId: userChatSettings.vectorStoreId)
     }
 
+    @PostMapping("/stream/chat")
+    Flux<String> streamChat(@RequestBody GenDescRequest chatRequest) {
+        UserChatSettings userChatSettings = loadUserChatSetting()
+        String conversationId = userChatSettings.conversationId
+        String initialSystemInstructions = null
+        if (!userChatSettings.conversationId) {
+            // 1) Create a server-side conversation (OpenAI will track the context)
+            initialSystemInstructions = systemInstructions
+            conversationId = openAIAssistantService.createConversation()
+            saveUserSetting(userChatSettings.vectorStoreId, conversationId)
+            log.info("created new conversation: [{}]", conversationId)
+        }
+        return openAIAssistantService.streamAskWithServerContext(conversationId, userChatSettings.vectorStoreId, initialSystemInstructions, chatRequest.instructions).map { it.text }
+    }
+
     @GetMapping("/userChatSettings")
     def getUserChatSettings() {
         return loadUserChatSetting()

@@ -96,17 +96,7 @@ const startGeneration = () => {
 
   isGenerating.value = true
   addChatItem(props.generationStartedMsg, ChatRole.ASSISTANT, true)
-  if (props.generateProject) {
-    openaiService.chat(promptInstructions)
-      .then((response) => {
-        appendGeneratedToLastChatItem(response.data.response)
-        setFinalMsgToLastChatItem(props.generationCompletedMsg)
-        isGenerating.value = false
-        focusOnInstructionsInput()
-      })
-  } else {
-    genWithStreaming(promptInstructions)
-  }
+  genWithStreaming(promptInstructions)
 }
 defineExpose({
   addWelcomeMsg,
@@ -219,6 +209,7 @@ const genWithStreaming = (instructionsToSend) => {
   lastPromptCancelled.value = false
   checkThatProgressWasMade()
   scrollInstructionsIntoView()
+  const endpoint = props.generateProject ? '/openai/stream/chat' : '/openai/stream/description'
   return openaiService.prompt(instructionsToSend,
       (chunk) => {
         const chunkRes = props.chunkHandlerFn(chunk)
@@ -247,7 +238,7 @@ const genWithStreaming = (instructionsToSend) => {
           setFinalMsgToLastChatItem(props.failedToGenerateMsg, true)
         }
         focusOnInstructionsInput()
-      })
+      }, endpoint)
 }
 const lastPromptCancelled = ref(false)
 const cancelCurrentPrompt = () => {
