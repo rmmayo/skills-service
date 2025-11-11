@@ -154,29 +154,6 @@ class OpenAIAssistantService {
         }
     }
 
-    /**
-     * Ask a question using the Responses API with the file_search tool.
-     * The vector store is supplied via tool_resources.file_search.vector_store_ids.
-     * Docs: Responses API + file_search guide.
-     */
-    String askWithFileSearch(String vectorStoreId, List<Map> messages) {
-        Map body = [
-                model: "gpt-5",
-                input: messages,
-                tools: [[type: "file_search", vector_store_ids: [vectorStoreId]]]
-                // (optional) response_format / temperature / max_output_tokens, etc…
-        ]
-
-        Map resp = webClient.post()
-                .uri("/responses")
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(Map)
-                .block()
-
-        return extractText(resp)
-    }
-
     /** Create a persistent conversation to let OpenAI manage multi-turn context. */
     String createConversation() {
         Map resp = webClient.post()

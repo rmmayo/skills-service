@@ -126,26 +126,6 @@ The response should be structured and scannable: Detailed descriptions that use 
         return vectorStoreId
     }
 
-    @PostMapping("/startNewChatWithoutContext")
-    String chatWithoutContext(@RequestBody ChatRequest chatRequest) {
-        // Messages we’ll carry across turns (client-managed context)
-        def messages = [
-            [
-                role   : "system",
-                content: [[type: "input_text", text: systemInstructions]]
-            ]
-        ]
-
-        // 3) Ask the first question against file_search (Responses API)
-        def q1 = chatRequest.question
-        log.debug("\nQuestion: [{}]", q1)
-        messages << [role: "user", content: [[type: "input_text", text: q1]]]
-
-        def a1 = openAIAssistantService.askWithFileSearch(chatRequest.vectorStoreId, messages)
-        log.info("\nAnswer:\n[{}]", a1)
-        return a1
-    }
-
     @PostMapping("/chat")
     ChatResponse chat(@RequestBody ChatRequest chatRequest) {
         UserChatSettings userChatSettings = loadUserChatSetting()
