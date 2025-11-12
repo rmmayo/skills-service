@@ -64,11 +64,39 @@ class OpenAIAssistantService {
         return callGetEndpoint("/vector_stores/${storeId}/files".toString())
     }
 
+    def getConversation(String conversationId) {
+        return callGetEndpoint("/conversations/${conversationId}".toString())
+    }
+
+    def deleteVectorStoreFile(String vectorStoreId, String fileId) {
+        callDeleteEndpoint("/files/${fileId}")
+        def res = callDeleteEndpoint("/vector_stores/${vectorStoreId}/files/${fileId}")
+        return res
+    }
+
+    def deleteVectorStore(String vectorStoreId) {
+        def vectorStoreFiles = getVectorStoreFiles(vectorStoreId)
+        vectorStoreFiles.data.each { file ->
+            deleteFile(file.id)
+        }
+        return callDeleteEndpoint("/vector_stores/${vectorStoreId}")
+    }
+
+    def deleteFile(String fileId) {
+        return callDeleteEndpoint("/files/${fileId}")
+    }
 
     private def callGetEndpoint(String endpoint) {
         return webClient.get()
                 .uri(endpoint)
-                .contentType(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .bodyToMono(Map)
+                .block()
+    }
+
+    private def callDeleteEndpoint(String endpoint) {
+        return webClient.delete()
+                .uri(endpoint)
                 .retrieve()
                 .bodyToMono(Map)
                 .block()
@@ -236,7 +264,7 @@ class OpenAIAssistantService {
                 // Some models emit a final consolidated text chunk
                 if ("response.output_text.done".equals(event)) {
                     String text = node.path("text").asText("")
-                    log.info("Response: [{}] from json=[{}]", text, node)
+                    log.debug("Response: [{}] from json=[{}]", text, node)
                     return
                 }
 

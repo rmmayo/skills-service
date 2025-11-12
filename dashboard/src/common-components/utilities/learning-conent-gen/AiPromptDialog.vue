@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 <script setup>
-import {nextTick, onMounted, ref} from 'vue'
+import {nextTick, onMounted, ref, computed} from 'vue'
 import Fieldset from 'primevue/fieldset';
 import SkillsDialog from "@/components/utils/inputForm/SkillsDialog.vue";
 import {useRoute} from "vue-router";
@@ -25,7 +25,6 @@ import {useLog} from "@/components/utils/misc/useLog.js";
 import PrefixControls from "@/common-components/utilities/markdown/PrefixControls.vue";
 import {useAppConfig} from "@/common-components/stores/UseAppConfig.js";
 import {useOpenaiService} from "@/common-components/utilities/learning-conent-gen/UseOpenaiService.js";
-import SkillsDropDown from "@/components/utils/inputForm/SkillsDropDown.vue";
 import Slider from "primevue/slider";
 
 const model = defineModel()
@@ -50,7 +49,15 @@ const props = defineProps({
     type: String,
     default: null
   },
+  useGeneratedLabel: {
+    type: String,
+    default: 'Use Generated Value'
+  },
   generateProject: {
+    type: Boolean,
+    default: false
+  },
+  loadingAdditionalData: {
     type: Boolean,
     default: false
   },
@@ -77,6 +84,10 @@ const route = useRoute()
 const log = useLog()
 const appConfig = useAppConfig()
 const openaiService = useOpenaiService()
+
+const loading = computed(() => {
+  return props.loadingAdditionalData || loadingModels.value
+})
 
 const addWelcomeMsg = (welcomeMsg) => {
   chatHistory.value.push({
@@ -126,7 +137,6 @@ onMounted(() => {
     loadingModels.value = false
   })
 })
-
 
 const ChatRole = {
   USER: 'user',
@@ -197,7 +207,7 @@ const checkThatProgressWasMade = () => {
       if (isGenerating.value && numAttempts < MAX_ATTEMPTS && lastItem.generatedValue.length === initialLength) {
         lastItem.origMessage += ` \n${statusMessages[numAttempts]}`
         numAttempts += 1
-        log.info(`GenerateDescriptionDialog: Checking progress attempt=[${numAttempts}]`)
+        log.info(`AiPromptDialog: Checking progress attempt=[${numAttempts}]`)
         checkProgress()
       }
     }, TIMEOUT_MS)
@@ -287,10 +297,10 @@ const finalMsgSeverity = (historyItem) => historyItem.failedToGenerate ? 'error'
       :show-cancel-button="false"
       :enable-return-focus="true">
 
-    <skills-spinner v-if="loadingModels" :is-loading="loadingModels" />
-    <div v-if="!loadingModels" class="py-5 flex flex-col" style="min-height: 70vh">
+    <skills-spinner v-if="loading" :is-loading="loading" />
+    <div v-show="!loading" class="py-5 flex flex-col" style="min-height: 70vh">
       <div>
-        <div class="flex gap-2 items-center justify-end mb-3">
+        <div v-if="showModelSettings" class="flex gap-2 items-center justify-end mb-3">
           <label class="italic">Model:</label>
           <div class="font-semibold">{{ selectedModel.model }}</div>
           <skills-button icon="fa-solid fa-gear" size="small" @click="showModelSettings = !showModelSettings" />
@@ -353,7 +363,7 @@ const finalMsgSeverity = (historyItem) => historyItem.failedToGenerate ? 'error'
                 <SkillsButton
                     icon="fa-solid fa-check-double"
                     severity="info" :outlined="false"
-                    label="Use Generated Value"
+                    :label="useGeneratedLabel"
                     :data-cy="`useGenValueBtn-${historyItem.id}`"
                     :loading="isAddingPrefix"
                     @click="useGenerated(historyItem.id)"/>

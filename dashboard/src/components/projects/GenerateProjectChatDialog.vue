@@ -5,7 +5,7 @@ writing, software distributed under the License is distributed on an "AS IS" BAS
 WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
 language governing permissions and limitations under the License. */
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import MarkdownText from '@/common-components/utilities/markdown/MarkdownText.vue'
 import { useLog } from '@/components/utils/misc/useLog.js'
@@ -15,6 +15,7 @@ import { useDescriptionValidatorService } from '@/common-components/validators/U
 import { useAppConfig } from '@/common-components/stores/UseAppConfig.js'
 import AiPromptDialog from '@/common-components/utilities/learning-conent-gen/AiPromptDialog.vue'
 import AiKnowledgeStore from '@/common-components/utilities/learning-conent-gen/AiKnowledgeStore.vue'
+import { useOpenaiService } from '@/common-components/utilities/learning-conent-gen/UseOpenaiService.js'
 
 const model = defineModel()
 const props = defineProps({
@@ -29,10 +30,12 @@ const log = useLog()
 const imgHandler = useImgHandler()
 const appConfig = useAppConfig()
 const instructionsGenerator = useInstructionGenerator()
+const openaiService = useOpenaiService()
 
 const currentDescription = ref('')
 const extractedImageState = { hasImages: false, extractedImages: null }
 
+const userChatSettings = ref(null)
 const aiPromptDialogRef = ref(null)
 const updateDescription = (newDesc) => {
   currentDescription.value = newDesc
@@ -43,37 +46,35 @@ const updateDescription = (newDesc) => {
 
   aiPromptDialogRef.value.addWelcomeMsg(welcomeMsg)
 }
+const chatHasResponded = ref(false)
+const followOnInstructions = computed(() => {
+  return userChatSettings.value?.conversationId || chatHasResponded.value
+})
 defineExpose({
   updateDescription
 })
+const knowledgeStoreLoading = ref(true)
+const loadingUserChatSettings = ref(true)
+const isLoading = computed(() => {
+  return knowledgeStoreLoading.value || loadingUserChatSettings.value
+})
 onMounted(() => {
-  updateDescription()
+  openaiService.getUserChatSettings().then((res) => {
+    userChatSettings.value = res
+    loadingUserChatSettings.value = false
+    updateDescription()
+  })
 })
 
 const createPromptInstructions = (userEnterInstructions) => {
-  let instructionsToSend = ''
-  // if (currentDescription.value) {
-  //   const extractedImagesRes = imgHandler.extractImages(currentDescription.value)
-  //   const descriptionText = extractedImagesRes.hasImages
-  //     ? extractedImagesRes.processedText
-  //     : currentDescription.value
-  //   const instructionsToKeepPlaceholders = extractedImagesRes.hasImages
-  //     ? imgHandler.instructionsToKeepPlaceholders()
-  //     : ''
-  //   instructionsToSend = instructionsGenerator.existingDescriptionInstructions(
-  //     descriptionText,
-  //     userEnterInstructions,
-  //     instructionsToKeepPlaceholders
-  //   )
-  //   if (extractedImagesRes.hasImages) {
-  //     extractedImageState.extractedImages = extractedImagesRes.extractedImages
-  //   }
-  // } else {
-  //   instructionsToSend = instructionsGenerator.newDescriptionInstructions(userEnterInstructions)
-  // }
+  let instructionsToSend = userEnterInstructions
+  if (followOnInstructions.value) {
+    instructionsToSend = `
+### User Instructions: ${userEnterInstructions}
 
-  instructionsToSend = userEnterInstructions
-
+Don't forget that this is a user-friendly preview of the training that you will generate that will be show to the user for review as markdown using the previously entered system instructions.
+  `
+  }
   return instructionsToSend
 }
 
@@ -85,6 +86,7 @@ const handleGeneratedChunk = (chunk) => {
 }
 
 const handleGenerationCompleted = (generated) => {
+  chatHasResponded.value = true
   let generatedValue = generated.generatedValue
   let generateValueChangedNotes = null
 
@@ -139,9 +141,11 @@ const handleAddPrefix = (historyItem, missingPrefix) => {
     :add-prefix-fn="handleAddPrefix"
     :community-value="communityValue"
     :generateProject="true"
+    :useGeneratedLabel="'Generate Training'"
+    :loading-additional-data="isLoading"
     @use-generated="useGenerated">
     <template #onTop>
-      <ai-knowledge-store />
+      <ai-knowledge-store v-if="!loadingUserChatSettings" :vector-store-id="userChatSettings.vectorStoreId" @knowledge-store-loaded="knowledgeStoreLoading=false"/>
     </template>
     <template #generatedValue="{ historyItem }">
       <markdown-text

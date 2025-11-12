@@ -68,7 +68,7 @@ class OpenAiController {
     static final String SETTING_GROUP = 'user'
 
     final String systemInstructions = """
-You are a chatbot designed to assist in creating a comprehensive training profile for the SkillTree application. Your primary goal is to develop a structured curriculum that can be seamlessly translated into SkillTree subjects, skills, and badges.
+You are a chatbot designed to assist in creating a comprehensive training profile for the SkillTree application. Your primary goal is to develop a structured curriculum that can be seamlessly translated into SkillTree subjects, skills, and badges.  This is a user-friendly preview of the training that you will generate that will be show to the user for review as markdown using the following instructions.  
 
 ### Detailed Instructions:
 - **Knowledge Base Utilization**:
@@ -80,7 +80,8 @@ You are a chatbot designed to assist in creating a comprehensive training profil
 - **Structure & Format**:
   - Ensure responses are well-structured and scannable.
   - When generating detailed descriptions use Markdown for formatting, including headers, tables, and code blocks where appropriate.
-  - When generating detailed descriptions use include images from the knowledge base when they enhance understanding. Images should be base64 encoded and included in the directrly in the markdown response.
+  - When generating detailed descriptions use include images from the knowledge base when they enhance understanding. Images should be base64 encoded and included in the directly in the markdown response.
+  - **Important**: The skill description **is** the _actual lesson content_ and should teach the user everything they need to know to understand the skill and should *not* describe what the user _will learn_.  After reading the contents of the skill description the user should fully understand the skill and be able to apply it.
 
 - **Content Quality**:
   - Provide detailed descriptions for each subject, skill, and badge.
@@ -91,7 +92,7 @@ You are a chatbot designed to assist in creating a comprehensive training profil
   - Initially, present the training profile in a Markdown format for easy review.
   - Be prepared to translate the training profile into a SkillTree-specific JSON format upon request.
   - Do not mention JSON format to the end user.
-  - Do not mention Notes or gaps or any other follow up information to the end user.
+  - Only out the Training Profile contents as the Example Output shows below. *Do not* summarize or mention notes or gaps or any other follow up information or follow up questions to the end user.
 
 ### Handling Ambiguity:
 - If the knowledge base lacks sufficient information, clearly state the gaps and suggest potential solutions.
@@ -185,6 +186,10 @@ Translate the training profile into a SkillTree-specific JSON format.
     def listFiles() {
         return openAIAssistantService.listFiles()
     }
+    @GetMapping("/conversations/{id}")
+    def getConversation(@PathVariable("id") String conversationId) {
+        return openAIAssistantService.getConversation(conversationId)
+    }
 
     @PostMapping(value = "/stream/description", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     Flux<String> generateDescriptionAndStream(@RequestBody GenDescRequest genDescRequest) {
@@ -206,17 +211,22 @@ Translate the training profile into a SkillTree-specific JSON format.
         def vectorFiles = openAIAssistantService.getVectorStoreFiles(userChatSettings.vectorStoreId)
         def allFilesParsed = openAIAssistantService.listFiles()
 
-        vectorFiles.data.collect { vectorFile -> {
+        def foundFiles = vectorFiles.data.collect { vectorFile -> {
             def file = allFilesParsed.data.find { it.id == vectorFile.id }
-            return [
-                    id: vectorFile.id,
-                    status: vectorFile.status,
-                    filename: file.filename,
-                    created_at: file.created_at,
-                    purpose: file.purpose,
-                    bytes: file.bytes
-            ]
+            if (file) {
+                return [
+                        id        : vectorFile.id,
+                        status    : vectorFile.status,
+                        filename  : file.filename,
+                        created_at: file.created_at,
+                        purpose   : file.purpose,
+                        bytes     : file.bytes
+                ]
+            } else {
+                return null
+            }
         }}
+        return foundFiles.collect { it }
     }
 
     @PostMapping('/uploadAndStore')
@@ -251,6 +261,14 @@ Translate the training profile into a SkillTree-specific JSON format.
         log.info("Vector store is ready.")
         saveUserSetting(vectorStoreId, null)
         return [vectorStoreId: vectorStoreId, files: files ]
+    }
+
+    @DeleteMapping("/files/{fileId}")
+    def deleteFile(@PathVariable("fileId") String fileId) {
+        UserChatSettings userChatSettings = loadUserChatSetting()
+        String vectorStoreId = userChatSettings.vectorStoreId
+        assert vectorStoreId, "No vector store id found in user settings"
+        return openAIAssistantService.deleteVectorStoreFile(vectorStoreId, fileId)
     }
 
     @PostMapping("/generateProjectJson")
@@ -304,6 +322,8 @@ Translate the training profile into a SkillTree-specific JSON format.
 
     @DeleteMapping("/userChatSettings")
     def deleteUserChatSettings() {
+        def userChatSettings = getUserChatSettings()
+        openAIAssistantService.deleteVectorStore(userChatSettings.vectorStoreId)
         return deleteUserChatSetting()
     }
 

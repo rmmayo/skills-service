@@ -29,7 +29,7 @@ export const useOpenaiService = () => {
                     'Accept': 'text/event-stream'
                 },
                 body: JSON.stringify({ instructions }),
-                signal: currentRequestController.signal  // Add the signal to the request
+                signal: currentRequestController.signal // Add the signal to the request
             })
 
             // Check if the response is not OK (status code 200-299)
@@ -97,16 +97,27 @@ export const useOpenaiService = () => {
     }
 
     const getAvailableModels = () => {
-      return axios.get(`/openai/models`).then((response) => response.data);
+        return axios.get(`/openai/models`).then((response) => response.data);
     }
 
     const generateProjectJson = () => {
-      return axios.post(`/openai/generateProjectJson`).then((response) => response.data.response);
+        return axios.post(`/openai/generateProjectJson`).then((response) => response.data.response);
     }
 
-    const getKnowledgeStoreFiles = ()  => {
-        return axios.get(`/openai/storeFiles`)
-            .then((response) => response.data);
+    const getKnowledgeStoreFiles = () => {
+        return axios.get(`/openai/storeFiles`).then((response) => response.data);
+    }
+
+    const getUserChatSettings = () => {
+        return axios.get(`/openai/userChatSettings`).then((response) => response.data)
+    }
+
+    const deleteUserChatSettings = () => {
+        return axios.delete(`/openai/userChatSettings`)
+    }
+
+    const deleteFileFromStore = (filename) => {
+        return axios.delete(`/openai/files/${filename}`)
     }
 
     return {
@@ -115,5 +126,8 @@ export const useOpenaiService = () => {
         getAvailableModels,
         generateProjectJson,
         getKnowledgeStoreFiles,
+        getUserChatSettings,
+        deleteUserChatSettings,
+        deleteFileFromStore,
     }
 }

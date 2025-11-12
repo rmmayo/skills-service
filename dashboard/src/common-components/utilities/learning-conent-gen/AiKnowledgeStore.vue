@@ -1,20 +1,20 @@
 <script setup>
-import {computed, onMounted, ref} from 'vue'
-import {FileUpload} from "primevue";
-import {usePrimeVue} from 'primevue/config';
-import {useToast} from "primevue/usetoast";
-import FileUploadService from "@/common-components/utilities/FileUploadService.js";
-import {useOpenaiService} from "@/common-components/utilities/learning-conent-gen/UseOpenaiService.js";
-import SkillsSpinner from "@/components/utils/SkillsSpinner.vue";
-import SkillsButton from "@/components/utils/inputForm/SkillsButton.vue";
+import { computed, onMounted, ref } from 'vue'
+import { FileUpload } from 'primevue'
+import { usePrimeVue } from 'primevue/config'
+import { useToast } from 'primevue/usetoast'
+import FileUploadService from '@/common-components/utilities/FileUploadService.js'
+import { useOpenaiService } from '@/common-components/utilities/learning-conent-gen/UseOpenaiService.js'
+import SkillsSpinner from '@/components/utils/SkillsSpinner.vue'
+import SkillsButton from '@/components/utils/inputForm/SkillsButton.vue'
 
-const $primevue = usePrimeVue();
-const toast = useToast();
+const $primevue = usePrimeVue()
+const toast = useToast()
 
-const totalSize = ref(0);
-const totalSizePercent = ref(0);
+const totalSize = ref(0)
+const totalSizePercent = ref(0)
 const currentKnowledgeFiles = ref([])
-const files = ref([]);
+const files = ref([])
 const initLoading = ref(true)
 const manageFiles = ref(false)
 
@@ -23,38 +23,51 @@ const showFileUpload = ref(false)
 
 const openAiService = useOpenaiService()
 
+const emit = defineEmits(['knowledge-store-loaded'])
+
+const props = defineProps({
+  vectorStoreId: {
+    type: String,
+    default: null
+  }
+})
+
+const vectorStoreIdInternal = ref(props.vectorStoreId)
+
 onMounted(() => {
-  loadKnowledgeStore().finally(() => initLoading.value = false)
+  loadKnowledgeStore().finally(() => {
+    initLoading.value = false
+    emit('knowledge-store-loaded')
+  })
 })
 
 const onRemoveTemplatingFile = (file, removeFileCallback, index) => {
-  removeFileCallback(index);
+  removeFileCallback(index)
   // totalSize.value -= parseInt(formatSize(file.size));
   // totalSizePercent.value = totalSize.value / 10;
   files.value = files.value.filter((f) => f.name !== file.name)
-};
+}
 
 const loadKnowledgeStore = () => {
   return openAiService.getKnowledgeStoreFiles().then((response) => {
-    currentKnowledgeFiles.value = response.filter((it) => it.filename !== 'SkillTreeConcepts.pdf')
-    console.log('loaded knowledge store')
+    currentKnowledgeFiles.value = response.filter((it) => it && it.filename !== 'SkillTreeConcepts.pdf')
   })
 }
 
 const onClearTemplatingUpload = (clear) => {
-  clear();
-  totalSize.value = 0;
-  totalSizePercent.value = 0;
-};
+  clear()
+  totalSize.value = 0
+  totalSizePercent.value = 0
+}
 
 const onSelectedFiles = (event) => {
-  files.value = event.files;
+  files.value = event.files
   files.value.forEach((file) => {
-    totalSize.value += parseInt(formatSize(file.size));
-  });
-};
+    totalSize.value += parseInt(formatSize(file.size))
+  })
+}
 
-const incrementProgress = ()  => {
+const incrementProgress = () => {
   setTimeout(() => {
     totalSizePercent.value = totalSizePercent.value + 5
     if (showFileUpload.value) {
@@ -86,31 +99,41 @@ const uploadTrainingDocuments = () => {
 }
 const uploadAndStore = (formData) => {
   const endpoint = '/openai/uploadAndStore'
-  return FileUploadService.asyncUpload(endpoint, formData).then((response) => response.data);
+  return FileUploadService.asyncUpload(endpoint, formData).then((response) => {
+    const vectorStore = response.data
+    if (!vectorStoreIdInternal.value) {
+      vectorStoreIdInternal.value = vectorStore.vectorStoreId
+    }
+    return vectorStore
+  })
 }
 
-
 const onTemplatedUpload = () => {
-  toast.add({severity: "info", summary: "Success", detail: "File Uploaded", life: 3000});
-};
+  toast.add({ severity: 'info', summary: 'Success', detail: 'File Uploaded', life: 3000 })
+}
 
 const formatSize = (bytes) => {
-  const k = 1024;
-  const dm = 3;
-  const sizes = $primevue.config.locale.fileSizeTypes;
+  const k = 1024
+  const dm = 3
+  const sizes = $primevue.config.locale.fileSizeTypes
 
   if (bytes === 0) {
-    return `0 ${sizes[0]}`;
+    return `0 ${sizes[0]}`
   }
 
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  const formattedSize = parseFloat((bytes / Math.pow(k, i)).toFixed(dm));
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const formattedSize = parseFloat((bytes / Math.pow(k, i)).toFixed(dm))
 
-  return `${formattedSize} ${sizes[i]}`;
-};
+  return `${formattedSize} ${sizes[i]}`
+}
 
 const removeFromStore = (file) => {
-
+  console.log(`removing file ${file.filename}, vector store id: ${vectorStoreIdInternal.value}`)
+  if (vectorStoreIdInternal.value) {
+    openAiService.deleteFileFromStore(file.id).then(() => {
+      currentKnowledgeFiles.value = currentKnowledgeFiles.value.filter((f) => f.id !== file.id)
+    })
+  }
 }
 
 const showManageFiles = () => {
@@ -137,28 +160,47 @@ const statusSeverity = (file) => {
       <div class="text-2xl mb-2 flex gap-2 items-center">
         <div class="flex-1 flex gap-1 items-center">
           <i class="fa-solid fa-brain"></i> AI File Knowledge Store
-          <skills-spinner v-if="initLoading" :is-loading="true" :size-in-rem="1.5" :is-inline="true"/>
-          <Badge :value="`${currentKnowledgeFiles.length} Files`" severity="warn"/>
+          <skills-spinner
+            v-if="initLoading"
+            :is-loading="true"
+            :size-in-rem="1.5"
+            :is-inline="true" />
+          <Badge :value="`${currentKnowledgeFiles.length} Files`" severity="warn" />
         </div>
-        <SkillsButton v-if="!initLoading" :icon="`fa-solid ${manageFiles ? 'fa-circle-minus': 'fa-circle-plus'}`" :label="manageFiles ? 'Collapse' : 'Manage'" @click="showManageFiles" size="small"></SkillsButton>
+        <SkillsButton
+          v-if="!initLoading"
+          :icon="`fa-solid ${manageFiles ? 'fa-circle-minus' : 'fa-circle-plus'}`"
+          :label="manageFiles ? 'Collapse' : 'Manage'"
+          @click="showManageFiles"
+          size="small"></SkillsButton>
       </div>
       <div v-if="!initLoading && manageFiles">
         <!--      <Message v-if="isStoreEmpty" :closable="false">AI Knowledge store is Empty <SkillsButton label="Upload Files" icon="fa-solid fa-file-circle-plus" @click="showFileUpload=true"></SkillsButton></Message>-->
         <div class="mb-2">
-          <div v-if="!isStoreEmpty" class="flex flex-wrap gap-4 my-3 ">
-            <div v-for="(file) of currentKnowledgeFiles" :key="file.id"
-                 class="p-4 rounded-border flex flex-col border border-surface items-center gap-4 w-[18rem] h-[13rem]">
-            <span class="font-semibold text-ellipsis max-w-60 whitespace-nowrap overflow-hidden">{{
-                file.filename
-              }}</span>
+          <div v-if="!isStoreEmpty" class="flex flex-wrap gap-4 my-3">
+            <div
+              v-for="file of currentKnowledgeFiles"
+              :key="file.id"
+              class="p-4 rounded-border flex flex-col border border-surface items-center gap-4 w-[18rem] h-[13rem]">
+              <span
+                class="font-semibold text-ellipsis max-w-60 whitespace-nowrap overflow-hidden"
+                >{{ file.filename }}</span
+              >
               <div>{{ formatSize(file.bytes) }}</div>
-              <Badge :value="file.status" class="mt-4" :severity="statusSeverity(file)"/>
-              <Button icon="fa-solid fa-eraser" @click="removeFromStore(file)" variant="outlined" rounded
-                      severity="danger"/>
+              <Badge :value="file.status" class="mt-4" :severity="statusSeverity(file)" />
+              <Button
+                icon="fa-solid fa-eraser"
+                @click="removeFromStore(file)"
+                variant="outlined"
+                rounded
+                severity="danger"
+                data-cy="remove-file-from-store-button" />
             </div>
-            <Button v-if="!showFileUpload"
-                    class="p-8 rounded-border flex flex-col justify-center border border-surface items-center gap-4 w-[18rem] h-[13rem]"
-                    outlined @click="showFileUpload=true">
+            <Button
+              v-if="!showFileUpload"
+              class="p-8 rounded-border flex flex-col justify-center border border-surface items-center gap-4 w-[18rem] h-[13rem]"
+              outlined
+              @click="showFileUpload = true">
               <span class="text-5xl"> <i class="fa-solid fa-file-circle-plus"></i> </span>
               <div>Add More Files</div>
             </Button>
@@ -166,20 +208,37 @@ const statusSeverity = (file) => {
 
           <!--        <SkillsButton v-if="!showFileUpload" label="Upload More Files" icon="fa-solid fa-file-circle-plus" @click="showFileUpload=true"></SkillsButton>-->
         </div>
-        <FileUpload v-if="showFileUpload" name="demo[]" :multiple="true"
-                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.json,.xml,.rtf,.odt,.ods,.odp,.odg,.odc,.odf,.odb,.tex,.md"
-                    @select="onSelectedFiles">
+        <FileUpload
+          v-if="showFileUpload"
+          name="demo[]"
+          :multiple="true"
+          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.json,.xml,.rtf,.odt,.ods,.odp,.odg,.odc,.odf,.odb,.tex,.md"
+          @select="onSelectedFiles">
           <template #header="{ chooseCallback, uploadCallback }">
             <!--      <pre>{{ files }}</pre>-->
             <div class="flex flex-wrap justify-between items-center flex-1 gap-4">
               <div class="flex gap-2">
-                <SkillsButton @click="chooseCallback()" icon="fa-solid fa-file-circle-plus" rounded variant="outlined"
-                              severity="secondary" label="Add"></SkillsButton>
-                <SkillsButton @click="uploadEvent(uploadCallback)" icon="fa-solid fa-upload" rounded variant="outlined"
-                              severity="success" :disabled="!files || files.length === 0" label="Upload"></SkillsButton>
+                <SkillsButton
+                  @click="chooseCallback()"
+                  icon="fa-solid fa-file-circle-plus"
+                  rounded
+                  variant="outlined"
+                  severity="secondary"
+                  label="Add"></SkillsButton>
+                <SkillsButton
+                  @click="uploadEvent(uploadCallback)"
+                  icon="fa-solid fa-upload"
+                  rounded
+                  variant="outlined"
+                  severity="success"
+                  :disabled="!files || files.length === 0"
+                  label="Upload"></SkillsButton>
                 <!--          <SkillsButton @click="clearCallback()" icon="fa-solid fa-xmark" rounded variant="outlined" severity="danger" :disabled="!files || files.length === 0" label="Clear"></SkillsButton>-->
               </div>
-              <ProgressBar :value="totalSizePercent" :showValue="false" class="md:w-20rem h-1 w-full md:ml-auto">
+              <ProgressBar
+                :value="totalSizePercent"
+                :showValue="false"
+                class="md:w-20rem h-1 w-full md:ml-auto">
                 <span class="whitespace-nowrap">{{ totalSize }}B / 1Mb</span>
               </ProgressBar>
             </div>
@@ -189,15 +248,22 @@ const statusSeverity = (file) => {
               <div v-if="files.length > 0">
                 <h5 class="text-xl">Pending</h5>
                 <div class="flex flex-wrap gap-4">
-                  <div v-for="(file, index) of files" :key="file.name + file.type + file.size"
-                       class="p-8 rounded-border flex flex-col border border-surface items-center gap-4">
-                <span class="font-semibold text-ellipsis max-w-60 whitespace-nowrap overflow-hidden">{{
-                    file.name
-                  }}</span>
+                  <div
+                    v-for="(file, index) of files"
+                    :key="file.name + file.type + file.size"
+                    class="p-8 rounded-border flex flex-col border border-surface items-center gap-4">
+                    <span
+                      class="font-semibold text-ellipsis max-w-60 whitespace-nowrap overflow-hidden"
+                      >{{ file.name }}</span
+                    >
                     <div>{{ formatSize(file.size) }}</div>
-                    <Badge value="Pending" severity="warn"/>
-                    <Button icon="fa-solid fa-eraser" @click="onRemoveTemplatingFile(file, removeFileCallback, index)"
-                            variant="outlined" rounded severity="danger"/>
+                    <Badge value="Pending" severity="warn" />
+                    <Button
+                      icon="fa-solid fa-eraser"
+                      @click="onRemoveTemplatingFile(file, removeFileCallback, index)"
+                      variant="outlined"
+                      rounded
+                      severity="danger" />
                   </div>
                 </div>
               </div>
@@ -205,7 +271,8 @@ const statusSeverity = (file) => {
           </template>
           <template #empty>
             <div class="flex items-center justify-center flex-col">
-              <i class="fa-solid fa-cloud-arrow-up !border-2 !rounded-full !p-8 !text-4xl !text-muted-color"/>
+              <i
+                class="fa-solid fa-cloud-arrow-up !border-2 !rounded-full !p-8 !text-4xl !text-muted-color" />
               <p class="mt-6 mb-0">Drag and drop files to here to upload.</p>
             </div>
           </template>
@@ -215,6 +282,4 @@ const statusSeverity = (file) => {
   </Card>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

@@ -290,6 +290,7 @@ const projectGenerated = async (generatedProject) => {
             return { ...projRes, originalProjectId: projectId }
           })
       }
+      openaiService.deleteUserChatSettings()
       return ProjectService.getProject(projectId)
         .then((retrievedProj) => {
           const projWithOriginalId = { ...retrievedProj, originalProjectId: projectId }
