@@ -56,11 +56,11 @@ const onSelectedFiles = (event) => {
 
 const incrementProgress = ()  => {
   setTimeout(() => {
-    totalSizePercent.value = totalSizePercent.value + 10
+    totalSizePercent.value = totalSizePercent.value + 5
     if (showFileUpload.value) {
       incrementProgress()
     }
-  }, 50);
+  }, 100);
 }
 
 const uploadEvent = (callback) => {
@@ -119,6 +119,16 @@ const showManageFiles = () => {
     showFileUpload.value = true
   }
 }
+
+const statusSeverity = (file) => {
+  if (file.status === 'in_progress') {
+    return 'warning'
+  } else if (file.status === 'failed') {
+    return 'danger'
+  } else {
+    return 'success'
+  }
+}
 </script>
 
 <template>
@@ -142,7 +152,7 @@ const showManageFiles = () => {
                 file.filename
               }}</span>
               <div>{{ formatSize(file.bytes) }}</div>
-              <Badge :value="file.status" class="mt-4" severity="success"/>
+              <Badge :value="file.status" class="mt-4" :severity="statusSeverity(file)"/>
               <Button icon="fa-solid fa-eraser" @click="removeFromStore(file)" variant="outlined" rounded
                       severity="danger"/>
             </div>

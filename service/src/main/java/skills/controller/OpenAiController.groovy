@@ -210,7 +210,7 @@ Translate the training profile into a SkillTree-specific JSON format.
             def file = allFilesParsed.data.find { it.id == vectorFile.id }
             return [
                     id: vectorFile.id,
-                    status: file.status,
+                    status: vectorFile.status,
                     filename: file.filename,
                     created_at: file.created_at,
                     purpose: file.purpose,
