@@ -165,7 +165,7 @@ class OpenAIAssistantService {
                     .block()
 
             List<Map> files = (List<Map>) listing.get("data")
-            if (files != null && files.every { f -> !"in_progress".equalsIgnoreCase((String) f.get("status")) }) {
+            if (files != null && files.size() > 0 && files.every { f -> !"in_progress".equalsIgnoreCase((String) f.get("status")) }) {
                 return
             }
             if (counter++ % 10 == 0) {
@@ -255,6 +255,8 @@ class OpenAIAssistantService {
                 // Token-by-token text
                 if ("response.output_text.delta".equals(event)) {
                     String delta = node.path("delta").asText("")
+                    delta = delta.replaceAll('(?m)^```|^markdown$|^```markdown$', '')
+                    delta = delta.replaceAll('(?m)^\\s+[#]', '#')
                     delta = delta.replaceAll('\\n', '<<newline>>')
                     log.trace("Response: [{}] from json=[{}]", delta, node)
                     if (!delta.isEmpty()) sink.next(new StreamChunk(type: "delta", text: delta))

@@ -69,11 +69,11 @@ const onSelectedFiles = (event) => {
 
 const incrementProgress = () => {
   setTimeout(() => {
-    totalSizePercent.value = totalSizePercent.value + 5
+    totalSizePercent.value = totalSizePercent.value + 1
     if (showFileUpload.value) {
       incrementProgress()
     }
-  }, 100);
+  }, 500);
 }
 
 const uploadEvent = (callback) => {
