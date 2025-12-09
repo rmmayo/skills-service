@@ -40,18 +40,22 @@ const themeHelper = useThemesHelper()
       <upgrade-in-progress-warning />
       <div class="flex flex-wrap pt-4 px-4 pb-2 justify-center mb-4 border-b border-surface-200 dark:border-surface-600">
         <div class="flex-1 justify-center">
-          <div class="flex">
+          <div class="flex items-center gap-2">
             <router-link data-cy="skillTreeLogo" class="" to="/">
-              <SkillTreeHeaderSvgIcon />
+<!--              <SkillTreeHeaderSvgIcon />-->
+              <img src="@/assets/img/synergy_logo.jpg" style="height: 2.5rem" alt="SkillTree logo" class="mx-auto"/>
             </router-link>
-            <div v-if="pathPath.isAdminPage.value"
-                 ref="adminStamp"
-                 class="skills-stamp"
-                 :class="{
-                   'skills-stamp-color-light-theme': !themeHelper.isDarkTheme,
-                   'skills-stamp-color-dark-theme': themeHelper.isDarkTheme,
-                 }"
-            >ADMIN</div>
+<!--            <div><i class="fa-solid fa-plus text-gray-600"></i></div>-->
+<!--            <div> <SkillTreeHeaderSvgIcon /></div>-->
+            <div class="text-3xl italic" style="color: #0a5ee1">SkillTree</div>
+<!--            <div v-if="pathPath.isAdminPage.value"-->
+<!--                 ref="adminStamp"-->
+<!--                 class="skills-stamp"-->
+<!--                 :class="{-->
+<!--                   'skills-stamp-color-light-theme': !themeHelper.isDarkTheme,-->
+<!--                   'skills-stamp-color-dark-theme': themeHelper.isDarkTheme,-->
+<!--                 }"-->
+<!--            >ADMIN</div>-->
           </div>
         </div>
         <div class="flex-none">

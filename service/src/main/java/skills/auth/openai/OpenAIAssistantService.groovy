@@ -210,7 +210,7 @@ class OpenAIAssistantService {
         ]
 
         Map body = [
-                model        : "gpt-5",
+                model        : "gpt-5.1",
                 store        : true,                 // Keep context on the server
                 conversation : conversationId,       // Bind to the same conversation
                 input        : inputItems,
